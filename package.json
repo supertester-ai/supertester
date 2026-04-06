@@ -1,0 +1,35 @@
+{
+  "name": "software-testing-agent",
+  "version": "1.0.0",
+  "description": "AI-powered software testing agent - generate functional test cases and Playwright E2E scripts from requirement documents",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0",
+    "lint": "echo \"No linter configured\" && exit 0"
+  },
+  "keywords": [
+    "testing",
+    "test-automation",
+    "playwright",
+    "e2e",
+    "ai",
+    "claude",
+    "software-testing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/software-testing-agent"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
