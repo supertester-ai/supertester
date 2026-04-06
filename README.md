@@ -73,16 +73,53 @@ software-testing-agent/
 
 ### 安装
 
+**方式一：克隆仓库**
+
 ```bash
-# 克隆仓库
-git clone https://github.com/your-org/software-testing-agent.git
-cd software-testing-agent
+git clone https://gitcode.com/orion-c/TestingAgent.git
+cd TestingAgent
+```
 
-# 安装依赖
-npm install
+**方式二：安装为 oh-my-opencode 插件**
 
-# 或作为 oh-my-opencode 插件安装
-# 将 SKILL.md 和 src/ 复制到你的插件目录
+```bash
+# 在你的项目目录创建插件目录
+mkdir -p .claude/skills/testing-agent
+
+# 复制技能文件
+cp /path/to/TestingAgent/SKILL.md .claude/skills/testing-agent/
+cp -r /path/to/TestingAgent/src .claude/skills/testing-agent/
+cp /path/to/TestingAgent/testing-agent.config.js ./
+```
+
+**方式三：使用 npm 包**
+
+```bash
+npm install @orion-c/testing-agent
+```
+
+### 初始化配置
+
+在项目根目录创建 `testing-agent.config.js`：
+
+```javascript
+// testing-agent.config.js
+module.exports = {
+  conventions: {
+    testDirectory: "__tests__",
+    fileSuffix: ".test"
+  },
+  requirements: {
+    docPatterns: ["**/requirements/**/*.md", "**/*spec*.md"]
+  },
+  clarification: {
+    askBeforeGeneration: true,
+    maxQuestionsPerRound: 3
+  },
+  workflow: {
+    requireConfirmation: true
+  }
+}
 ```
 
 ### 使用方式
