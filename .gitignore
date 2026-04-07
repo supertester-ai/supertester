@@ -1,34 +1,12 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-build/
-
-# Session state (local only)
-sessions/*.json
-!sessions/.gitkeep
-
-# Reports
-reports/
-*.log
+# OS
+.DS_Store
+Thumbs.db
 
 # Editor
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-.env.local
-
-# Test coverage
-coverage/
 
 # Temporary files
 tmp/
