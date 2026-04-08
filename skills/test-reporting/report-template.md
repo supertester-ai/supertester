@@ -6,6 +6,7 @@
 - **Total Test Cases:** N
 - **Automation Rate:** X%
 - **Review Status:** All phases reviewed
+- **Coverage Summary:** [一句话总结行为覆盖与证据覆盖情况]
 
 ## Requirement Coverage
 
@@ -20,6 +21,23 @@
 - Fully Covered: N (X%)
 - Partially Covered: N (X%)
 - Not Covered: N (X%)
+
+## Coverage Dimensions
+
+| Dimension | Status | Evidence | Notes |
+|-----------|--------|----------|-------|
+| Behavior | [covered/partial/missing] | [source] | [notes] |
+| Rules / Enumerations | [covered/partial/missing] | [source] | [notes] |
+| Content | [covered/partial/missing] | [source] | [notes] |
+| State / Data | [covered/partial/missing] | [source] | [notes] |
+| Integration | [covered/partial/missing] | [source] | [notes] |
+| Evidence Chain | [covered/partial/missing] | [source] | [notes] |
+
+## Critical Test Assets
+
+| Asset Type | Description | Coverage | Handling |
+|------------|-------------|----------|----------|
+| [Rules / Content / State / Contract / Integration] | [asset] | [covered/partial/missing] | [automated/manual/preserved] |
 
 ## Functional Test Cases Summary
 
@@ -40,6 +58,9 @@
 | partial | N | X% |
 | manual | N | X% |
 
+### Manual Retention Notes
+- [为什么某些测试资产保留为人工或半自动]
+
 ## Cross-Module Scenarios
 
 | ID | Name | Type | Modules | Status |
@@ -57,6 +78,21 @@
 | TC ID | Name | Reason |
 |-------|------|--------|
 | TC-020 | [name] | [why manual] |
+
+## Gap Analysis
+
+### Covered
+- [已明确覆盖的能力、规则或资产]
+
+### Preserved Manual Coverage
+- [虽未脚本化但已被人工用例明确保留的资产]
+
+### Missing or Partial
+- [当前仍缺失或仅部分覆盖的维度、规则、资产]
+
+### Recommended Next Actions
+1. [补强建议]
+2. [补强建议]
 
 ## Traceability Matrix
 

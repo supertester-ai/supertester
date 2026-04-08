@@ -9,12 +9,20 @@
   -
 - Files created/modified:
   -
+- Assets extracted:
+  -
+- Evidence types identified:
+  -
 
 ### Phase 2: 需求关联分析
 - **Status:** pending
 - Actions taken:
   -
 - Files created/modified:
+  -
+- Dependencies identified:
+  -
+- Evidence/shared resource risks:
   -
 
 ### Phase 3: 功能测试用例生成
@@ -23,12 +31,18 @@
   -
 - Files created/modified:
   -
+- Coverage dimensions addressed:
+  -
+- Critical assets preserved:
+  -
 
 ### Phase 4: 自动化可行性分析
 - **Status:** pending
 - Actions taken:
   -
 - Files created/modified:
+  -
+- Manual-only / partial reasons:
   -
 
 ### Phase 5: 自动化脚本生成
@@ -37,6 +51,10 @@
   -
 - Files created/modified:
   -
+- Scripted coverage:
+  -
+- Intentionally retained manual coverage:
+  -
 
 ### Phase 6: 测试报告
 - **Status:** pending
@@ -44,11 +62,25 @@
   -
 - Files created/modified:
   -
+- Reported gaps:
+  -
+- Recommended next actions:
+  -
 
 ## Review Results
 | Phase | Reviewer | Result | Issues | Record |
 |-------|----------|--------|--------|--------|
 |       |          |        |        |        |
+
+## Coverage Summary
+| Dimension | Status | Notes |
+|-----------|--------|-------|
+| Behavior |        |       |
+| Rules / Enumerations |        |       |
+| Content |        |       |
+| State / Data |        |       |
+| Integration |        |       |
+| Evidence Chain |        |       |
 
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
