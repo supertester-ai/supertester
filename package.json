@@ -1,0 +1,6 @@
+{
+  "name": "supertester",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AI-driven software testing workflow - from requirements to Playwright E2E scripts"
+}

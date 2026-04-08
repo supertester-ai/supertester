@@ -1,10 +1,15 @@
-# 软件测试智能体插件 - 设计规格说明书
+# Supertester - 软件测试智能体插件设计规格说明书
 
 ## 概述
 
-**插件名称：** `software-testing-agent`  
-**类型：** 独立技能插件  
-**核心功能：** AI 驱动的软件测试助手，覆盖完整测试生命周期：需求解析、功能测试用例生成、自动化脚本生成和测试分析。  
+**插件名称：** `supertester`
+**类型：** Superpowers 风格的纯 Markdown 技能插件（零代码依赖）
+**架构融合：**
+- **Superpowers** — Skill 行为塑造模式（Iron Law / Hard Gate / Red Flags / 验证循环）
+- **planning-with-files** — 3 文件持久化 + Hooks 注意力操控 + 会话恢复
+- **测试领域知识** — 需求解析、用例生成、自动化脚本、测试分析
+
+**核心功能：** AI 驱动的软件测试助手，覆盖完整测试生命周期：需求解析、需求关联分析、功能测试用例生成、自动化脚本生成和测试报告。
 **目标用户：** 使用 Playwright 进行 Web E2E 测试的 JavaScript/TypeScript 开发者。
 
 ---
@@ -17,7 +22,13 @@
 
 大型需求文档（markdown 文件、PRD、规范说明）在任何测试生成之前必须被解析和分析。模糊或不清晰的需求会触发澄清对话。
 
-### 原则二：两阶段测试生成
+### 原则二：文件即记忆
+
+> **上下文窗口 = 内存（易失、有限），文件系统 = 磁盘（持久、无限）。**
+
+借鉴 planning-with-files 的核心哲学：所有重要信息必须写入磁盘文件。每个阶段的输入和输出都落盘为本地 Markdown 文件，保持全程可追溯。Agent 不依赖上下文记忆，而是依赖持久化文件作为工作记忆。
+
+### 原则三：两阶段测试生成
 
 ```
 ┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────────────┐
@@ -35,404 +46,617 @@
 - 仅在功能测试用例确认后开始
 - 生成 Playwright E2E 测试代码
 - **为每个测试用例标记：**
-  - 🤖 `automatable` - 可完全自动化
-  - ⚠️ `partial` - 部分可自动化，需人工介入
-  - 👤 `manual` - 需人工执行
+  - `automatable` - 可完全自动化
+  - `partial` - 部分可自动化，需人工介入
+  - `manual` - 需人工执行
 
-### 原则三：人工介入
+### 原则四：独立审查，不自证清白
+
+> **每个阶段的产出必须经过独立的 test-reviewer agent 审查，而非由生成 skill 自己验证自己。**
+
+生成器负责"创造"，审查器负责"质检"。这两个角色必须分离。
+
+### 原则五：人工介入门禁
 
 ```
 需求 → 解析 → [发现模糊?] → 澄清 ─┐
                                   │
          ┌────────────────────────┘
          ▼
-功能用例 ──▶ 用户审核 ──▶ 确认
-                           │
-                           ▼
-                  自动化脚本 ──▶ 带标记的输出
+关联分析 ──▶ 用户确认 ──▶ 功能用例 ──▶ 审查 ──▶ 用户确认
+                                                    │
+                                                    ▼
+                                  自动化脚本 ──▶ 带标记的输出
 ```
 
 ---
 
-## 架构设计
+## 插件架构
 
-### 整体架构
+### 架构总览
 
 ```
-用户输入
+supertester/
+├── .claude-plugin/                    # Claude Code 插件元数据
+│   ├── plugin.json                    # 插件清单
+│   └── marketplace.json               # marketplace 发布配置
+│
+├── hooks/                             # Hooks 注意力操控系统
+│   ├── hooks.json                     # 5 个 hook 配置
+│   ├── session-start                  # 注入 using-supertester + 恢复上下文
+│   ├── user-prompt-submit             # 每次消息注入当前阶段上下文
+│   ├── pre-tool-use                   # Write/Edit 前重温目标
+│   ├── post-tool-use                  # Write/Edit 后提醒更新进度
+│   ├── stop                           # 验证所有阶段完成度
+│   └── run-hook.cmd                   # Windows 兼容脚本
+│
+├── skills/                            # 7 个 Skill（核心测试工作流）
+│   ├── using-supertester/
+│   │   └── SKILL.md                   # 入口 skill：触发规则 + 3 文件模式 + skill 索引
+│   ├── requirement-analysis/
+│   │   ├── SKILL.md                   # 需求解析 + 澄清（含暂停/恢复）
+│   │   └── clarification-patterns.md  # 模糊需求识别模式参考
+│   ├── requirement-association/
+│   │   └── SKILL.md                   # 模块依赖 + 隐含需求 + 跨模块场景
+│   ├── test-case-generation/
+│   │   ├── SKILL.md                   # 智能编排 + 8 子生成器 + 去重
+│   │   └── generator-reference.md     # 子生成器详细参考
+│   ├── automation-analysis/
+│   │   └── SKILL.md                   # 自动化可行性分析 + 标记
+│   ├── automation-scripting/
+│   │   ├── SKILL.md                   # Playwright 代码生成
+│   │   └── playwright-patterns.md     # Playwright 最佳实践参考
+│   └── test-reporting/
+│       ├── SKILL.md                   # 报告生成
+│       └── report-template.md         # 报告模板
+│
+├── agents/                            # 独立审查 Agent
+│   └── test-reviewer.md              # 测试用例/脚本审查 agent
+│
+├── templates/                         # 3 文件持久化模板
+│   ├── test_plan.md                   # 测试计划模板（含 6 阶段）
+│   ├── findings.md                    # 发现记录模板
+│   └── progress.md                    # 进度日志模板
+│
+├── scripts/                           # 辅助脚本
+│   ├── init-session.sh                # 初始化 .supertester/ 目录
+│   ├── init-session.ps1               # Windows 版本
+│   └── session-catchup.py             # 会话恢复（跨 session 续接）
+│
+├── CLAUDE.md                          # 插件级说明
+├── AGENTS.md                          # Agent 说明
+├── package.json                       # 零依赖
+└── README.md                          # 使用文档
+```
+
+### 技术选型理由
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 插件模式 | Superpowers 风格（纯 Markdown Skill） | 零依赖、跨平台（Claude Code/Cursor/OpenCode/Gemini）、开发快 |
+| 持久化模式 | planning-with-files 3 文件模式 | 经过 96.7% pass rate 验证、会话恢复可靠、防目标漂移 |
+| 行为控制 | Iron Law + Hard Gate + Red Flags | Superpowers 验证过的 prompt 级行为塑造，无需代码 |
+| 质量保证 | 独立 test-reviewer agent | 生成与审查分离，避免"自证清白" |
+| 自动化框架 | Playwright | 目标用户为 Web E2E 测试的 JS/TS 开发者 |
+
+---
+
+## 文件持久化体系
+
+### 核心哲学
+
+借鉴 Manus/planning-with-files 的上下文工程原则：
+
+```
+上下文窗口 = 内存 (volatile, limited)
+文件系统    = 磁盘 (persistent, unlimited)
+→ 任何重要信息必须写入磁盘
+```
+
+### 3 文件工作记忆
+
+在项目目录下创建 `.supertester/` 目录，包含 3 个核心文件 + 阶段输出文件：
+
+#### 文件一：`test_plan.md` — 阶段追踪与决策记录
+
+**用途：** 测试工作的路线图和进度追踪器。
+
+**关键内容：**
+- 目标：一句话描述最终状态
+- 当前阶段：哪个阶段正在进行
+- 6 个阶段的状态：`pending` → `in_progress` → `complete`
+- 关键决策：每个技术/设计选择及其理由
+- 错误记录：每个错误及其尝试次数和解决方案
+
+**更新时机：**
+- 开始任务时（首先创建此文件）
+- 完成每个阶段时（更新状态）
+- 做出重要决策时（记录 Decision）
+- 遇到错误时（记录 Error + 尝试次数）
+
+#### 文件二：`findings.md` — 研究发现与知识库
+
+**用途：** 分析过程中的外部记忆，记录所有发现。
+
+**关键内容：**
+- 需求分析发现：从需求文档中提取的关键信息
+- 模块关联发现：模块依赖、隐含需求
+- 用例生成发现：子生成器选择理由、去重决策
+- 技术决策：架构和实现选择
+
+**关键规则 — 2-Action Rule：**
+> 每执行 2 个分析/搜索/浏览操作后，**必须**立即更新 findings.md。这防止了多模态信息在上下文重置时丢失。
+
+**安全边界：** 仅将外部/不可信内容写入 findings.md，不写入 test_plan.md。
+
+#### 文件三：`progress.md` — 会话日志与测试结果
+
+**用途：** 按时间线记录做了什么。
+
+**关键内容：**
+- 会话元数据（日期、时间戳）
+- 每个阶段的详细操作日志
+- 创建/修改的文件列表
+- 审查结果记录
+- 错误日志（带时间戳）
+
+**5 问题重启测试：** 如果能回答以下 5 个问题，说明上下文管理到位：
+
+```
+1. 我在哪里？      → test_plan.md 中的当前阶段
+2. 我要去哪里？    → 剩余阶段
+3. 目标是什么？    → test_plan.md 中的目标声明
+4. 我发现了什么？  → findings.md
+5. 我做了什么？    → progress.md
+```
+
+### 阶段输出文件
+
+除 3 个核心文件外，每个阶段的产出也持久化为独立文件：
+
+```
+项目目录/
+├── .supertester/                           # 测试工作流持久化目录
+│   ├── test_plan.md                        # [核心] 阶段追踪 + 决策 + 错误
+│   ├── findings.md                         # [核心] 研究发现 + 知识库
+│   ├── progress.md                         # [核心] 会话日志 + 审查结果
+│   │
+│   ├── requirements/                       # Phase 1-2 输出
+│   │   ├── parsed-requirements.md          # 结构化需求树
+│   │   ├── clarifications.json             # 澄清会话状态（支持暂停/恢复）
+│   │   ├── module-dependencies.md          # 模块依赖图
+│   │   ├── implicit-requirements.md        # 隐含需求列表
+│   │   └── cross-module-scenarios.md       # 跨模块场景
+│   │
+│   ├── test-cases/                         # Phase 3-4 输出
+│   │   ├── functional-cases.md             # 功能测试用例（人工可读）
+│   │   ├── automation-analysis.md          # 自动化可行性标记
+│   │   └── deduplication-report.md         # 去重报告
+│   │
+│   ├── scripts/                            # Phase 5 输出
+│   │   ├── *.spec.ts                       # Playwright 自动化脚本
+│   │   └── manual-cases.md                 # 仅人工执行的用例
+│   │
+│   ├── reviews/                            # test-reviewer 审查记录
+│   │   └── review-<phase>-<timestamp>.md   # 每次审查的详细记录
+│   │
+│   └── reports/                            # Phase 6 输出
+│       └── YYYY-MM-DD-<module>.md          # 最终测试报告
+```
+
+### 阶段间可追溯链
+
+每个产物都携带上游溯源 ID，形成完整追溯链：
+
+```
+需求文档 (requirements/*.md)
+    │  来源: 用户提供的原始文档
+    │  记录到: findings.md
+    ▼
+parsed-requirements.md (需求ID: F-001, F-002...)
+    │  来源: 需求文档行号
+    │  记录到: test_plan.md Phase 1 decisions
+    ▼
+clarifications.json (澄清ID: CL-001, CL-002...)
+    │  来源: F-xxx 的模糊项
+    │  记录到: progress.md 澄清日志
+    ▼
+cross-module-scenarios.md (场景ID: CMS-001...)
+    │  来源: F-xxx 的模块依赖分析
+    │  记录到: findings.md 关联发现
+    │  审查: test-reviewer → reviews/review-association-*.md
+    ▼
+functional-cases.md (用例ID: TC-001, 溯源: F-001 行45-48)
+    │  来源: F-xxx + CMS-xxx + IR-xxx
+    │  记录到: test_plan.md Phase 3 decisions
+    │  审查: test-reviewer → reviews/review-testcases-*.md
+    ▼
+automation-analysis.md (TC-001 → automatable)
+    │  来源: TC-xxx 的可行性分析
+    │  记录到: progress.md 分析日志
+    ▼
+*.spec.ts (代码注释: // TC-001 | F-001)
+    │  来源: TC-xxx + 自动化标记
+    │  审查: test-reviewer → reviews/review-scripts-*.md
+    ▼
+report.md (完整追溯链: 需求 → 用例 → 脚本)
+```
+
+---
+
+## Hooks 注意力操控系统
+
+### 设计哲学
+
+借鉴 planning-with-files 的核心洞察：**通过 hooks 在关键时刻将目标文件重新注入 agent 的注意力窗口，防止在大量工具调用后发生目标漂移。**
+
+### Hook 配置
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{
+      "matcher": "startup|clear|compact",
+      "hooks": [{
+        "type": "command",
+        "command": "session-start",
+        "timeout": 10000,
+        "async": false
+      }]
+    }],
+    "UserPromptSubmit": [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "user-prompt-submit",
+        "timeout": 5000,
+        "async": false
+      }]
+    }],
+    "PreToolUse": [{
+      "matcher": "Write|Edit|Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "pre-tool-use",
+        "timeout": 5000,
+        "async": false
+      }]
+    }],
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "post-tool-use",
+        "timeout": 5000,
+        "async": false
+      }]
+    }],
+    "Stop": [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "stop",
+        "timeout": 10000,
+        "async": false
+      }]
+    }]
+  }
+}
+```
+
+### Hook 行为详情
+
+| Hook | 触发时机 | 文件操作 | 注入内容 | 目的 |
+|------|---------|---------|---------|------|
+| **SessionStart** | 会话开始/clear/compact | Read | using-supertester skill + test_plan.md 前 50 行 + progress.md 最近记录 | 恢复上下文、注入 skill |
+| **UserPromptSubmit** | 每次用户发送消息 | Read | test_plan.md 当前阶段 + 当前阶段的 Iron Law | 防止目标漂移 |
+| **PreToolUse** | Write/Edit/Bash 执行前 | Read | test_plan.md 前 30 行（目标 + 当前阶段） | 决策前重温目标 |
+| **PostToolUse** | Write/Edit 执行后 | Display | "记得更新 progress.md 和阶段输出文件" | 保持进度同步 |
+| **Stop** | Agent 尝试停止 | Read + Check | 检查 test_plan.md 中所有阶段的 Status | 防止过早退出 |
+
+### Stop Hook 逻辑
+
+```bash
+# 读取 test_plan.md，计算阶段完成度
+TOTAL=$(grep -c "### Phase" .supertester/test_plan.md)
+COMPLETE=$(grep -cF "**Status:** complete" .supertester/test_plan.md)
+
+if [ "$TOTAL" -eq "$COMPLETE" ]; then
+  echo "All phases complete. Safe to stop."
+else
+  echo "WARNING: Only $COMPLETE/$TOTAL phases complete."
+  echo "Incomplete phases found. Continue working or ask user to confirm early stop."
+fi
+```
+
+---
+
+## Skill 体系设计
+
+### Skill 总览
+
+| # | Skill | Iron Law | 输入 | 输出文件 | 审查点 |
+|---|-------|----------|------|---------|--------|
+| 0 | using-supertester | — | 用户触发 | 初始化 .supertester/ 3 文件 | — |
+| 1 | requirement-analysis | 不理解需求不准测试 | 需求文档 | parsed-requirements.md, clarifications.json | — |
+| 2 | requirement-association | 不分析关联不准生成用例 | parsed-requirements.md | module-dependencies.md, implicit-requirements.md, cross-module-scenarios.md | test-reviewer |
+| 3 | test-case-generation | 按特征选生成器，不盲目全调用 | 上述所有需求文件 | functional-cases.md, deduplication-report.md | test-reviewer |
+| 4 | automation-analysis | 未确认用例不准分析 | functional-cases.md（已确认） | automation-analysis.md | — |
+| 5 | automation-scripting | 只为确认用例生成脚本 | functional-cases.md + automation-analysis.md | *.spec.ts, manual-cases.md | test-reviewer |
+| 6 | test-reporting | — | 全部阶段输出 | reports/YYYY-MM-DD-*.md | — |
+
+### Skill 0：using-supertester（入口）
+
+**触发条件：** SessionStart hook 自动注入
+
+**职责：**
+1. 检查 `.supertester/` 目录是否存在
+   - 不存在 → 从 templates/ 初始化 3 个核心文件
+   - 已存在 → 读取 test_plan.md 恢复当前阶段
+2. 根据用户意图路由到对应 skill
+3. 告知用户可用的 skill 和触发方式
+
+**意图路由：**
+
+| 用户意图 | 触发 Skill | 示例 |
+|---------|-----------|------|
+| 解析需求文档 | requirement-analysis | "分析 requirements/auth-prd.md" |
+| 继续澄清 | requirement-analysis（恢复） | "继续澄清"、"恢复 CL-002" |
+| 分析模块关联 | requirement-association | "分析模块依赖" |
+| 生成功能用例 | test-case-generation | "生成登录模块的测试用例" |
+| 分析自动化可行性 | automation-analysis | "分析哪些可以自动化" |
+| 生成自动化脚本 | automation-scripting | "生成 Playwright 脚本" |
+| 生成报告 | test-reporting | "生成测试报告" |
+| 查询/问答 | 直接回答 | "checkout 模块需要哪些测试？" |
+
+### Skill 1：requirement-analysis（需求解析与澄清）
+
+**Iron Law：**
+> **不理解需求，就不准生成任何测试。**
+> 如果你还没有完成需求解析和澄清，你不能调用 test-case-generation skill。
+
+**Hard Gate：**
+```
+<HARD-GATE>
+在所有模糊项澄清完毕之前，不准进入 requirement-association 阶段。
+这适用于所有需求文档，无论看起来多清晰。
+</HARD-GATE>
+```
+
+**流程：**
+
+```
+需求文档
     │
     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      意图路由器                              │
-│           (解析用户意图：需求分析/功能用例/自动化脚本)          │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      需求解析器                              │
-│            (解析需求文档，提取模块、功能点、边界条件)          │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      需求澄清器                              │
-│              (检测模糊需求，发起澄清对话)                      │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    需求关联分析器                             │
-│            (模块依赖分析 → 隐含需求挖掘 → 跨模块场景生成)       │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-         ┌───────────────────┴───────────────────┐
-         │                                           │
-         ▼                                           ▼
-┌─────────────────────┐               ┌─────────────────────┐
-│   功能用例生成器     │               │    需求清晰则继续     │
-│   (单模块用例)       │               │                     │
-└──────────┬──────────┘               └──────────┬──────────┘
-           │                                     │
-            ▼                                     │
-┌─────────────────────┐                         │
-│     用户确认环节      │ ◀────────────────────────┘
-└──────────┬──────────┘
-           │ (确认后)
-           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      自动化可行性分析器                       │
-│               (分析每个用例，标记自动化可行性)                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    自动化脚本生成器                           │
-│                (生成框架代码，标记自动化等级)                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       输出格式化器                           │
-│                    (终端摘要 + 报告文件)                      │
-└─────────────────────────────────────────────────────────────┘
+解析 Markdown → 提取模块/功能/验收标准/边界条件
+    │
+    ▼
+检测模糊项 → [有模糊项?]
+    │                │
+    │ 无             │ 有
+    ▼                ▼
+写入 parsed-      发起澄清对话（一次一问，多选优先）
+requirements.md       │
+    │                │
+    │                ▼ 每次交互后自动保存状态到 clarifications.json
+    │                │
+    │           [支持暂停/恢复]
+    │                │
+    │                ▼ 所有项澄清完毕
+    │                │
+    └────────────────┘
+    │
+    ▼
+更新 test_plan.md Phase 1 → complete
+更新 findings.md 需求发现
+更新 progress.md 操作日志
 ```
 
-**需求关联分析器**是架构流程中的必要环节，位于需求澄清之后、功能用例生成之前：
-- 解析模块间的依赖关系
-- 挖掘需求中隐含的场景
-- 生成跨模块的关联测试场景
+**2-Action Rule 落地：**
+- 解析了 2 个模块 → 立即写入 parsed-requirements.md
+- 完成了 2 轮澄清 → 立即更新 clarifications.json
 
-### 组件详情
+**澄清会话状态（clarifications.json）：**
 
-#### 1. 意图路由器
-
-**用途：** 解析用户输入，确定测试任务类型。
-
-**支持的意图：**
-- `parse` - 解析需求文档，提取可测试项
-- `clarify` - 处理模糊需求
-- `functional` - 生成功能测试用例
-- `automate` - 根据已确认用例生成自动化脚本
-- `analyze` - 分析现有测试覆盖率和缺口
-- `query` - 回答关于测试的问题
-
-**实现方式：**
-- 用户输入关键词模式匹配
-- 返回：`{ intent: string, confidence: number, parameters: object }`
-
-#### 2. 需求解析器
-
-**用途：** 解析大型需求文档（markdown），提取可测试项。
-
-**能力：**
-- 解析包含多个模块/章节的 markdown 文件
-- 提取功能、用户故事、验收标准
-- 识别文档中提到的模块、函数、类
-- 从文本中提取边界条件、错误场景
-- 构建结构化需求树
-
-**输出：**
-```javascript
+```json
 {
-  modules: [
+  "sessionId": "clarify-session-20260407-001",
+  "requirementDoc": "requirements/auth-prd.md",
+  "status": "in_progress",
+  "createdAt": "2026-04-07T10:00:00Z",
+  "updatedAt": "2026-04-07T14:30:00Z",
+  "completedClarifications": [
     {
-      name: "用户认证",
-      file: "auth.md",
-      features: [
-        {
-          id: "F-001",
-          name: "邮箱登录",
-          description: "...",
-          acceptanceCriteria: ["有效邮箱重定向到仪表板", "无效显示错误"],
-          boundaryConditions: ["空邮箱", "格式无效", "密码错误"],
-          dependencies: ["用户服务", "令牌服务"]
-        }
-      ]
+      "id": "CL-001",
+      "relatedFeature": "F-001",
+      "question": "最大登录尝试次数是多少？",
+      "answer": "5次",
+      "answeredAt": "2026-04-07T11:00:00Z"
     }
   ],
-  ambiguousItems: [
-    { module: "用户认证", feature: "F-001", unclear: "最大登录尝试次数是多少？" }
-  ]
-}
-```
-
-#### 3. 需求澄清器
-
-**用途：** 检测模糊需求并发起澄清对话。
-
-**核心特性：对话状态持久化与恢复**
-
-由于澄清过程可能因需要与项目团队沟通而中断，设计必须支持对话状态的持久化和恢复。
-
-**对话状态管理：**
-```javascript
-{
-  sessionId: "clarify-session-20260406-001",
-  requirementDoc: "requirements/auth-prd.md",
-  status: "in_progress" | "paused" | "completed",
-  createdAt: "2024-04-06T10:00:00Z",
-  updatedAt: "2024-04-06T14:30:00Z",
-  
-  // 已完成的澄清
-  completedClarifications: [
+  "pendingClarifications": [
     {
-      id: "CL-001",
-      question: "最大登录尝试次数是多少？",
-      answer: "5次",
-      answeredAt: "2024-04-06T11:00:00Z",
-      answeredBy: "user"
+      "id": "CL-002",
+      "relatedFeature": "F-001",
+      "question": "密码过期策略是什么？",
+      "status": "pending",
+      "options": ["90天", "180天", "永不过期"]
     }
   ],
-  
-  // 待澄清的项
-  pendingClarifications: [
-    {
-      id: "CL-002",
-      question: "密码过期策略是什么？",
-      status: "pending",
-      options: ["90天", "180天", "永不过期"]
-    }
-  ],
-  
-  // 当前暂停的原因
-  pauseReason: "需要与后端团队确认密码过期策略",
-  resumedFrom: null  // 如果是从中断恢复，记录恢复点
+  "pauseReason": "需要与后端团队确认密码过期策略"
 }
 ```
 
-**对话生命周期：**
+**恢复机制：**
 
-```
-┌─────────┐    开始澄清    ┌─────────────┐
-│  初始   │ ───────────▶ │  进行中     │
-└─────────┘               │ (in_progress)│
-                          └──────┬──────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-              ▼                  ▼                  ▼
-        ┌──────────┐      ┌──────────┐      ┌──────────┐
-        │ 已完成   │      │  已暂停   │      │  已中断   │
-        │(completed)│      │ (paused) │      │(aborted) │
-        └──────────┘      └────┬─────┘      └──────────┘
-                               │
-                               │ 恢复对话
-                               ▼
-                        ┌─────────────┐
-                        │ 从暂停点继续 │
-                        └─────────────┘
-```
+| 触发方式 | 行为 |
+|---------|------|
+| 用户说"继续澄清" | 读取最近的 clarifications.json，从 pendingClarifications 继续 |
+| 用户说"恢复 CL-002" | 恢复指定澄清项 |
+| 新会话启动 | SessionStart hook 检测到 clarifications.json 存在且 status != completed，提示用户 |
 
-**行为：**
-- 检测到模糊项时暂停
-- 采用一对一提问方式
-- 尽可能提供多选选项
-- 记录澄清内容供后续参考
-- **每次交互后自动保存状态**
-- **支持通过会话ID恢复中断的对话**
+**Red Flags：**
 
-**对话恢复机制：**
+| 如果你在想... | 现实是... |
+|--------------|----------|
+| "需求看起来很清楚" | 每个需求都有隐藏的模糊项，做完检测才知道 |
+| "跳过澄清直接生成" | 违反 Iron Law，模糊需求生成的用例是浪费 |
+| "用户催得急，先生成再说" | 返工成本远高于澄清成本 |
+| "这个模糊项不影响测试" | 你不是产品经理，让用户决定 |
 
-| 恢复触发方式 | 说明 |
-|-------------|------|
-| 用户说"继续澄清" | 自动查找最近的暂停会话并恢复 |
-| 用户说"恢复 CL-002" | 恢复指定的澄清项 |
-| 用户提供答案 | 自动关联到对应的暂停项并继续 |
+**输出格式（parsed-requirements.md）：**
 
-**澄清类型：**
-- 缺失的边界条件
-- 不清晰的验收标准
-- 未定义的错误处理
-- 模糊的数据约束
+```markdown
+# 需求解析结果
 
-#### 4. 需求关联分析器
+## 来源文档
+- requirements/auth-prd.md (解析时间: 2026-04-07T10:00:00Z)
 
-**用途：** 分析需求模块间的关联关系，挖掘隐含需求场景，生成跨模块测试用例。
+## 模块清单
 
-**核心能力：**
+### 模块：用户认证
 
-##### 4.1 模块依赖分析
+#### F-001: 邮箱登录
+- **描述：** 用户使用邮箱和密码登录系统
+- **验收标准：**
+  - 有效邮箱重定向到仪表板
+  - 无效邮箱显示错误
+- **边界条件：** 空邮箱, 格式无效, 密码错误
+- **依赖：** 用户服务, 令牌服务
+- **来源：** `requirements/auth-prd.md` 行 45-48
 
-**目的：** 构建模块间的依赖关系图，理解模块如何协同工作。
-
-**分析方法：**
-- 显式依赖：需求文档中明确提到的模块调用关系
-- 隐式依赖：通过数据流/事件流推断的模块关联
-- 共享资源依赖：多个模块依赖同一数据/服务
-
-**输出：**
-```javascript
-{
-  moduleGraph: {
-    nodes: [
-      { id: "用户认证", type: "core", dependencies: ["邮件服务", "令牌服务"] },
-      { id: "商品目录", type: "core", dependencies: ["库存服务", "搜索服务"] },
-      { id: "购物车", type: "core", dependencies: ["用户认证", "商品目录", "库存服务"] },
-      { id: "支付", type: "core", dependencies: ["购物车", "订单服务", "第三方支付"] }
-    ],
-    edges: [
-      { from: "用户认证", to: "购物车", type: "session" },
-      { from: "商品目录", to: "购物车", type: "data_flow" },
-      { from: "购物车", to: "支付", type: "workflow" }
-    ]
-  },
-  criticalPaths: [
-    ["用户认证", "商品目录", "购物车", "支付", "订单"],
-    ["用户认证", "购物车", "支付", "通知"]
-  ]
-}
+## 统计
+- 总模块: 4
+- 总功能: 12
+- 总验收标准: 28
+- 模糊项: 3 (已全部澄清)
 ```
 
-##### 4.2 隐含需求挖掘
+### Skill 2：requirement-association（需求关联分析）
 
-**目的：** 从需求文本中推断未明确说明但必须存在的场景。
+**Iron Law：**
+> **不分析关联，就不准生成用例。**
+> 单模块测试无法覆盖模块间的交互问题。必须先完成关联分析。
 
-**挖掘策略：**
-| 隐含类型 | 识别模式 | 示例 |
-|----------|----------|------|
-| 前置条件隐含 | "后" → 隐含"前" | "登录后显示仪表板" → 隐含未登录时的重定向需求 |
-| 后置结果隐含 | "为了X" → 隐含X失败的处理 | "为了完成订单" → 隐含库存不足/支付失败的场景 |
-| 数据一致性隐含 | A模块修改数据 → B模块应同步 | "用户修改邮箱" → 隐含订单中邮箱展示的同步需求 |
-| 边界情况隐含 | 正常流程 → 边界情况 | "允许添加购物车" → 隐含库存上限、超重、有效期等边界 |
-| 异常传导隐含 | 模块A异常 → 模块B如何响应 | "支付服务不可用" → 隐含订单状态、用户通知的处理 |
-
-**输出：**
-```javascript
-{
-  implicitRequirements: [
-    {
-      id: "IR-001",
-      impliedBy: {
-        module: "登录",
-        statement: "登录后显示用户仪表板"
-      },
-      inferredRequirement: {
-        name: "未登录访问保护",
-        description: "未登录用户访问 /dashboard 应重定向到登录页",
-        type: "security",
-        severity: "high"
-      }
-    },
-    {
-      id: "IR-002",
-      impliedBy: {
-        module: "订单",
-        statement: "为保证订单完成"
-      },
-      inferredRequirement: {
-        name: "支付失败处理",
-        description: "支付失败时订单应保持待支付状态，允许重试",
-        type: "error_handling",
-        severity: "critical"
-      }
-    }
-  ]
-}
+**Hard Gate：**
+```
+<HARD-GATE>
+在用户确认关联分析结果之前，不准进入 test-case-generation 阶段。
+</HARD-GATE>
 ```
 
-##### 4.3 跨模块场景生成
+**前置条件：** Phase 1 (requirement-analysis) 状态为 complete
 
-**目的：** 基于模块依赖分析，生成串联多个相关模块的测试场景。
+**流程：**
 
-**生成策略：**
-1. 从关键路径（critical paths）生成主流程场景
-2. 从模块边界（module boundaries）生成集成测试场景
-3. 从异常传导路径生成错误恢复场景
-
-**场景类型：**
-
-| 场景类型 | 描述 | 示例 |
-|----------|------|------|
-| 关键路径场景 | 覆盖核心业务流程的端到端场景 | 注册→登录→浏览→下单→支付→确认 |
-| 模块边界场景 | 测试模块间的接口和数据一致性 | 购物车数量变化→订单详情同步 |
-| 错误传导场景 | 一个模块的错误如何影响下游模块 | 支付超时→订单状态→通知用户 |
-| 并发场景 | 多模块间的状态一致性 | 用户同时打开多个页面购物车同步 |
-| 数据同步场景 | 模块间的数据一致性问题 | 修改收货地址→历史订单显示旧地址？ |
-
-**输出：**
-```javascript
-{
-  crossModuleScenarios: [
-    {
-      id: "CMS-001",
-      name: "完整购买流程（关键路径）",
-      scenarioType: "critical_path",
-      modules: ["用户认证", "商品目录", "购物车", "支付", "订单", "通知"],
-      steps: [
-        { step: 1, module: "用户认证", action: "用户登录系统", expected: "获取有效会话" },
-        { step: 2, module: "商品目录", action: "浏览并搜索商品", expected: "返回商品列表" },
-        { step: 3, module: "商品目录", action: "查看商品详情", expected: "显示库存、价格" },
-        { step: 4, module: "购物车", action: "添加商品到购物车", expected: "购物车计数+1" },
-        { step: 5, module: "购物车", action: "修改商品数量", expected: "实时更新总价" },
-        { step: 6, module: "支付", action: "发起支付流程", expected: "跳转支付网关" },
-        { step: 7, module: "支付", action: "支付成功回调", expected: "创建订单" },
-        { step: 8, module: "订单", action: "订单状态变更", expected: "状态变为已支付" },
-        { step: 9, module: "通知", action: "发送订单确认", expected: "邮件/短信通知" }
-      ],
-      entryCondition: "用户已注册，有有效商品",
-      exitCondition: "订单完成，用户收到确认通知"
-    },
-    {
-      id: "CMS-002",
-      name: "支付失败-订单恢复（错误传导）",
-      scenarioType: "error_propagation",
-      modules: ["支付", "订单", "通知", "购物车"],
-      steps: [
-        { step: 1, module: "购物车", action: "用户添加商品并发起结算", expected: "创建待支付订单" },
-        { step: 2, module: "支付", action: "用户选择支付方式", expected: "显示支付页面" },
-        { step: 3, module: "支付", action: "支付超时或失败", expected: "返回支付失败" },
-        { step: 4, module: "订单", action: "订单保持待支付状态", expected: "订单不自动取消" },
-        { step: 5, module: "购物车", action: "商品仍保留在购物车", expected: "用户可继续支付" },
-        { step: 6, module: "通知", action: "发送支付失败通知", expected: "提醒用户重试" }
-      ],
-      entryCondition: "用户发起支付",
-      exitCondition: "用户可重新支付或放弃"
-    },
-    {
-      id: "CMS-003",
-      name: "多设备购物车同步（并发场景）",
-      scenarioType: "concurrency",
-      modules: ["用户认证", "购物车"],
-      steps: [
-        { step: 1, module: "设备A", action: "用户登录并添加商品A到购物车", expected: "购物车显示1件商品" },
-        { step: 2, module: "设备B", action: "同一用户在其他设备登录", expected: "获取相同会话" },
-        { step: 3, module: "设备B", action: "设备B添加商品B到购物车", expected: "设备A购物车应同步显示2件" },
-        { step: 4, module: "设备A", action: "设备A删除商品A", expected: "设备B购物车应同步显示只剩商品B" }
-      ],
-      entryCondition: "用户登录状态，多设备",
-      exitCondition: "所有设备购物车状态一致"
-    }
-  ]
-}
+```
+parsed-requirements.md
+    │
+    ▼
+模块依赖分析 → module-dependencies.md
+    │  (显式依赖 + 隐式依赖 + 共享资源依赖)
+    │
+    ▼
+隐含需求挖掘 → implicit-requirements.md
+    │  (前置条件隐含 + 后置结果隐含 + 数据一致性隐含
+    │   + 边界情况隐含 + 异常传导隐含)
+    │
+    ▼
+跨模块场景生成 → cross-module-scenarios.md
+    │  (关键路径 + 模块边界 + 错误传导 + 并发 + 数据同步)
+    │
+    ▼
+→ test-reviewer agent 审查 → reviews/review-association-*.md
+    │
+    ▼
+→ 用户确认
+    │
+    ▼
+更新 test_plan.md Phase 2 → complete
 ```
 
-#### 5. 功能用例生成器（智能编排）
+**模块依赖输出格式（module-dependencies.md）：**
 
-**用途：** 分析每个需求点的特性，智能选择合适的子生成器，而非对所有需求调用所有生成器。
+```markdown
+# 模块依赖分析
+
+## 依赖图
+
+| 模块 | 类型 | 依赖 | 依赖类型 |
+|------|------|------|---------|
+| 用户认证 | core | 邮件服务, 令牌服务 | direct |
+| 购物车 | core | 用户认证, 商品目录, 库存服务 | direct |
+| 支付 | core | 购物车, 订单服务, 第三方支付 | workflow |
+
+## 关键路径
+1. 用户认证 → 商品目录 → 购物车 → 支付 → 订单
+2. 用户认证 → 购物车 → 支付 → 通知
+```
+
+**隐含需求输出格式（implicit-requirements.md）：**
+
+```markdown
+# 隐含需求
+
+| ID | 推断来源 | 隐含需求 | 类型 | 严重性 |
+|----|---------|---------|------|--------|
+| IR-001 | F-001: "登录后显示仪表板" | 未登录访问 /dashboard 应重定向到登录页 | security | high |
+| IR-002 | F-005: "为保证订单完成" | 支付失败时订单保持待支付状态，允许重试 | error_handling | critical |
+```
+
+**跨模块场景输出格式（cross-module-scenarios.md）：**
+
+```markdown
+# 跨模块测试场景
+
+## CMS-001: 完整购买流程（关键路径）
+
+**场景类型：** critical_path
+**涉及模块：** 用户认证, 商品目录, 购物车, 支付, 订单, 通知
+**入口条件：** 用户已注册，有有效商品
+**退出条件：** 订单完成，用户收到确认通知
+
+| 步骤 | 模块 | 操作 | 预期结果 |
+|------|------|------|---------|
+| 1 | 用户认证 | 用户登录系统 | 获取有效会话 |
+| 2 | 商品目录 | 浏览并搜索商品 | 返回商品列表 |
+| 3 | 购物车 | 添加商品到购物车 | 购物车计数+1 |
+| 4 | 支付 | 发起支付流程 | 跳转支付网关 |
+| 5 | 订单 | 订单状态变更 | 状态变为已支付 |
+| 6 | 通知 | 发送订单确认 | 邮件/短信通知 |
+
+**溯源：** F-001, F-003, F-005, F-008
+```
+
+**Red Flags：**
+
+| 如果你在想... | 现实是... |
+|--------------|----------|
+| "单模块够了" | 80% 的生产 bug 发生在模块交互边界 |
+| "不需要跨模块测试" | 用户流程天然跨模块，不测就是盲区 |
+| "关联分析太慢了" | 发现隐含需求比事后修 bug 便宜 100 倍 |
+
+### Skill 3：test-case-generation（功能用例生成）
+
+**Iron Law：**
+> **按需求特征选择生成器，不盲目全部调用。**
+> 每个需求先分析特征，再决定调用哪些子生成器。
+
+**Hard Gate：**
+```
+<HARD-GATE>
+在用户确认功能用例之前，不准进入 automation-analysis 阶段。
+用例未经 test-reviewer 审查之前，不准提交给用户确认。
+</HARD-GATE>
+```
+
+**前置条件：** Phase 2 (requirement-association) 状态为 complete
 
 **核心流程：**
+
 ```
-确认后的需求
+已确认的需求 + 关联分析结果
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -455,402 +679,67 @@
                     ┌─────────────────┐
                     │     去重引擎    │
                     └─────────────────┘
-```
-
-**需求特性分析器：**
-
-根据需求特征自动判断需要哪些生成器：
-
-```javascript
-{
-  requirementAnalysis: {
-    requirement: {
-      id: "F-001",
-      name: "用户登录",
-      type: "api" | "workflow" | "stateful" | "business_rule" | "security"
-    },
-    
-    // 需求特征判断
-    characteristics: {
-      hasInputValidation: true,      // 需要等价类、边界值
-      hasStateTransitions: true,     // 需要状态转换
-      hasBusinessRules: false,        // 不需要决策表
-      hasSecurityConcerns: true,      // 需要安全测试
-      isCrossModule: false,          // 跨模块由关联分析器处理
-      hasPerformanceRequirements: false
-    },
-    
-    // 决定调用的生成器
-    selectedGenerators: [
-      "equivalence",      // 必须：输入验证
-      "boundary",         // 必须：边界值
-      "exception",        // 必须：错误处理
-      "state",            // 必须：有状态转换
-      "security"          // 必须：有安全需求
-    ],
-    
-    // 不调用的生成器及原因
-    skippedGenerators: [
-      { generator: "decisionTable", reason: "无复杂业务规则" },
-      { generator: "performance", reason: "无性能需求描述" },
-      { generator: "scenario", reason: "单模块API，非工作流" }
-    ]
-  }
-}
+                              │
+                              ▼
+              → test-reviewer agent 审查
+                              │
+                              ▼
+                    → 用户确认
 ```
 
 **需求类型 → 生成器映射：**
 
 | 需求类型 | 必需生成器 | 可选生成器 |
 |----------|-----------|-----------|
-| **API/函数** | 等价类、边界值 | 异常场景 |
-| **工作流/业务流程** | 场景流、异常场景 | 等价类、边界值 |
-| **状态机模块** | 状态转换、场景流 | 边界值、异常场景 |
-| **复杂业务规则** | 决策表、等价类 | 边界值、安全测试 |
-| **安全敏感模块** | 安全测试、等价类 | 异常场景、边界值 |
-| **性能关键模块** | 性能测试、场景流 | 边界值 |
+| API/函数 | 等价类、边界值 | 异常场景 |
+| 工作流/业务流程 | 场景流、异常场景 | 等价类、边界值 |
+| 状态机模块 | 状态转换、场景流 | 边界值、异常场景 |
+| 复杂业务规则 | 决策表、等价类 | 边界值、安全测试 |
+| 安全敏感模块 | 安全测试、等价类 | 异常场景、边界值 |
+| 性能关键模块 | 性能测试、场景流 | 边界值 |
 
-**示例判断逻辑：**
+**8 个子生成器：**
 
-```javascript
-function selectGenerators(requirement) {
-  const selected = new Set();
-  
-  // 基础生成器：几乎所有需求都需要
-  selected.add('equivalence');  // 等价划分
-  selected.add('boundary');     // 边界值
-  
-  // 根据需求类型判断
-  if (requirement.type === 'api' || requirement.type === 'function') {
-    // API/函数：主要关注输入输出
-    selected.add('exception');  // 异常场景
-  }
-  
-  if (requirement.type === 'workflow' || requirement.type === 'stateful') {
-    // 工作流/状态机：需要状态转换
-    selected.add('state');
-    selected.add('scenario');
-  }
-  
-  if (requirement.hasComplexConditionals) {
-    // 复杂条件：需要决策表
-    selected.add('decisionTable');
-  }
-  
-  if (requirement.type === 'security' || requirement.securityRelated) {
-    // 安全相关：必须安全测试
-    selected.add('security');
-  }
-  
-  if (requirement.performanceCritical) {
-    // 性能关键：添加性能测试
-    selected.add('performance');
-  }
-  
-  return Array.from(selected);
-}
+| # | 生成器 | 适用场景 | 输出类型 |
+|---|--------|---------|---------|
+| 1 | 等价类生成器 | 输入验证、参数校验 | positive/negative 分区 |
+| 2 | 边界值生成器 | 数值/字符串/集合边界 | 边界值用例 |
+| 3 | 异常场景生成器 | 网络/系统/数据/安全错误 | 异常流程用例 |
+| 4 | 状态转换生成器 | 有限状态机模块 | 状态转换用例 |
+| 5 | 场景流生成器 | 单模块内的端到端流程 | happy/alternative/error_recovery |
+| 6 | 决策表生成器 | 复杂业务规则、多条件组合 | 条件组合用例 |
+| 7 | 安全测试生成器 | 注入、认证、会话、API 安全 | OWASP 分类用例 |
+| 8 | 性能测试生成器 | 负载、压力、持久性、峰值 | 性能指标用例 |
+
+**去重引擎：**
+
+```
+去重策略:
+- exact_duplicate: 相同输入、相同预期
+- subset_duplicate: 一个用例完全覆盖另一个
+- redundant_boundary: 边界值与等价类冗余
+- overlapping_state: 状态转换已被场景流覆盖
+
+合并规则:
+- 边界值 + 等价类冗余 → 保留边界值
+- 异常场景覆盖正常场景 → 保留异常场景
 ```
 
-**子生成器清单：**
+**用例输出格式（functional-cases.md）：**
 
-| 生成器 | 适用场景 | 判断条件 |
-|--------|----------|----------|
-| 等价类生成器 | 输入验证、参数校验 | `hasInputValidation: true` |
-| 边界值生成器 | 数值边界、长度限制 | `hasBoundaryConditions: true` |
-| 异常场景生成器 | 错误处理、异常流程 | `hasErrorHandling: true` |
-| 状态转换生成器 | 状态机、有限状态模块 | `hasStateTransitions: true` |
-| 场景流生成器 | 工作流、业务流程 | `type === 'workflow'` |
-| 决策表生成器 | 复杂业务规则、多条件 | `hasComplexConditionals: true` |
-| 安全测试生成器 | 安全敏感模块 | `type === 'security'` |
-| 性能测试生成器 | 性能关键模块 | `performanceCritical: true` |
-| 去重引擎 | 去除所有重复用例 | 始终调用 |
-| 场景流生成器 | 端到端场景测试 | 跨模块业务流程 |
-| 决策表生成器 | 复杂业务规则测试 | 条件组合、决策逻辑 |
-| 安全测试生成器 | 安全测试用例 | 注入、认证、数据保护 |
-| 性能测试生成器 | 非功能测试用例 | 负载、压力、响应时间 |
-| 去重引擎 | 去除重复用例 | 合并冗余测试用例 |
-
----
-
-##### 4.1 等价类生成器
-
-**用途：** 基于等价划分生成测试用例（正向/反向）。
-
-**等价类：**
-- 有效输入（应该通过）
-- 无效输入（应该以特定错误失败）
-- 边界值（边界情况）
-
-**输出：**
-```javascript
-{
-  type: "equivalence",
-  category: "positive" | "negative",
-  partition: "valid_email" | "invalid_format" | "empty" | "not_registered",
-  description: "有效邮箱格式应成功登录",
-  input: { email: "test@example.com", password: "ValidPass123" },
-  expectedResult: "登录成功，重定向到仪表板"
-}
-```
-
----
-
-##### 4.2 边界值生成器
-
-**用途：** 生成边界条件的测试用例。
-
-**边界类型：**
-- 数值边界（0、最大值、最小值、-1、溢出）
-- 字符串边界（空、最大长度、Unicode）
-- 集合边界（空数组、单个元素、大型数据集）
-
-**输出：**
-```javascript
-{
-  type: "boundary",
-  boundaryType: "length_max" | "value_min" | "empty" | "null" | "overflow",
-  description: "255个字符的邮箱（最大允许长度）",
-  input: { email: "a".repeat(250) + "@test.com", password: "ValidPass123" },
-  expectedResult: "根据规范接受或拒绝"
-}
-```
-
----
-
-##### 4.3 异常场景生成器
-
-**用途：** 生成错误条件和异常处理的测试用例。
-
-**异常类型：**
-- 网络错误（超时、断连）
-- 系统错误（崩溃、OOM）
-- 数据错误（损坏、无效状态）
-- 安全错误（未授权、禁止访问）
-
-**输出：**
-```javascript
-{
-  type: "exception",
-  exceptionType: "network_timeout" | "invalid_state" | "unauthorized_access",
-  description: "登录时网络超时",
-  preconditions: ["用户输入凭证", "网络变得不可用"],
-  steps: ["输入邮箱", "输入密码", "点击登录", "网络超时发生"],
-  expectedResult: "显示重试选项，不崩溃"
-}
-```
-
----
-
-##### 4.4 状态转换生成器
-
-**用途：** 生成基于状态的测试用例。
-
-**状态类型：**
-- 状态转换（logged_out → logging_in → logged_in）
-- 工作流序列（cart → checkout → payment → confirmation）
-- 会话状态（过期、更新、终止）
-
-**输出：**
-```javascript
-{
-  type: "state_transition",
-  fromState: "已登出",
-  event: "提交有效凭证",
-  toState: "已登录",
-  description: "使用有效凭证从已登出状态转换到已登录状态",
-  steps: ["验证初始状态为已登出", "提交有效凭证", "验证状态现在为已登录"]
-}
-```
-
----
-
-##### 4.5 场景流生成器
-
-**用途：** 生成覆盖单个模块内的端到端用户场景测试用例。
-
-**注意：** 跨模块的复杂场景由**需求关联分析器**（4.4节）负责生成。
-
-**适用场景（单模块内）：**
-- 模块内用户旅程测试
-- 模块内状态流转
-- 模块内错误处理
-
-**场景类型：**
-- 主流程（Happy Path）
-- 备选流程（Alternative Path）
-- 错误恢复流程（Error Recovery）
-
-**输出：**
-```javascript
-{
-  type: "scenario",
-  scenarioName: "登录流程（单模块）",
-  scenarioType: "happy_path" | "alternative" | "error_recovery",
-  module: "用户认证",
-  steps: [
-    { step: 1, action: "输入有效邮箱", expected: "邮箱格式验证通过" },
-    { step: 2, action: "输入正确密码", expected: "密码验证通过" },
-    { step: 3, action: "点击登录按钮", expected: "跳转到仪表板" }
-  ],
-  entryCondition: "用户打开登录页面",
-  exitCondition: "用户成功登录或显示错误"
-}
-```
-
-**与需求关联分析器的区别：**
-
-| 场景类型 | 生成器 | 范围 |
-|----------|--------|------|
-| 单模块内场景 | 场景流生成器 | 单个模块内的操作流程 |
-| 跨模块场景 | 需求关联分析器 | 多模块间的数据流/工作流 |
-
----
-
-##### 4.6 决策表生成器
-
-**用途：** 从具有多个输入条件的复杂业务规则生成测试用例。
-
-**适用场景：**
-- 定价规则（基于会员资格 + 数量 + 季节的折扣）
-- 验证规则（基于类型 + 必填 + 条件的字段验证）
-- 资格规则（基于多个条件的审批）
-
-**决策表结构：**
-```javascript
-{
-  conditionColumns: ["是否高级会员", "订单 > $100", "季节折扣"],
-  actionColumns: ["应用10%折扣", "应用20%折扣", "无折扣"],
-  rules: [
-    { conditions: [true, true, false], actions: ["应用10%折扣"] },
-    { conditions: [true, false, true], actions: ["应用20%折扣"] },
-    // ... 所有组合
-  ]
-}
-```
-
-**输出：**
-```javascript
-{
-  type: "decision_table",
-  ruleName: "折扣资格",
-  conditions: [
-    { name: "是否高级会员", type: "boolean", values: [true, false] },
-    { name: "订单金额", type: "numeric", values: ["<$50", "$50-$100", ">$100"] },
-    { name: "是否有优惠券", type: "boolean", values: [true, false] }
-  ],
-  rules: [
-    { id: "DT-001", conditions: [true, ">$100", true], expected: "25%折扣" },
-    { id: "DT-002", conditions: [true, "$50-$100", false], expected: "15%折扣" }
-  ],
-  testCases: [
-    { ruleId: "DT-001", input: {...}, expected: "25%折扣" }
-  ]
-}
-```
-
----
-
-##### 4.7 安全测试生成器
-
-**用途：** 生成以安全为重点的测试用例。
-
-**安全测试类别：**
-- 输入验证（SQL注入、XSS、命令注入）
-- 认证与授权（绕过、权限提升）
-- 数据保护（加密、PII处理）
-- 会话管理（会话固定、劫持、超时）
-- API安全（限流、CORS、CSRF）
-
-**输出：**
-```javascript
-{
-  type: "security",
-  category: "injection" | "auth" | "data_protection" | "session" | "api",
-  testName: "登录表单中的SQL注入",
-  attackVector: "' OR '1'='1",
-  description: "尝试通过邮箱字段进行SQL注入",
-  expectedBehavior: "输入被清理，无数据库暴露，显示错误",
-  severity: "critical" | "high" | "medium" | "low",
-  owaspCategory: "A03:2021 - Injection"
-}
-```
-
----
-
-##### 4.8 性能测试生成器
-
-**用途：** 生成非功能性性能测试用例。
-
-**性能测试类型：**
-- 响应时间测试（负载下的API响应）
-- 负载测试（并发用户限制）
-- 压力测试（断点识别）
-- 持久性测试（内存泄漏、随时间退化）
-- 峰值测试（流量突增）
-
-**输出：**
-```javascript
-{
-  type: "performance",
-  testType: "load" | "stress" | "endurance" | "spike",
-  testName: "负载下的登录API响应时间",
-  scenario: "100个并发用户尝试登录",
-  metrics: {
-    responseTime: { target: "<500ms", threshold: "<1000ms" },
-    throughput: { target: ">100 req/sec" },
-    errorRate: { target: "<1%" }
-  },
-  preconditions: ["服务器已部署", "测试数据已填充"],
-  testPhases: [
-    { phase: "ramp_up", duration: "2min", users: "0 → 100" },
-    { phase: "sustained", duration: "10min", users: "100" },
-    { phase: "ramp_down", duration: "1min", users: "100 → 0" }
-  ],
-  successCriteria: "95%的请求在500ms内完成"
-}
-```
-
----
-
-##### 4.9 去重引擎
-
-**用途：** 从所有子生成器中去除重复的测试用例。
-
-**去重策略：**
-```javascript
-{
-  strategies: [
-    "exact_duplicate",        // 相同输入、相同预期
-    "subset_duplicate",      // 一个用例覆盖另一个
-    "redundant_boundary",    // 边界值与等价类冗余
-    "overlapping_state"      // 状态转换已被覆盖
-  ],
-  mergeRules: {
-    boundary_plus_equivalence: "keep_boundary",
-    exception_covering_normal: "keep_exception"
-  }
-}
-```
-
-**去重输出：**
-```javascript
-{
-  originalCount: 45,
-  afterDeduplication: 28,
-  removed: [
-    { id: "TC-003", reason: "subset_duplicate", absorbedBy: "TC-001" }
-  ],
-  finalCases: [
-    // 去重、合并后的唯一测试用例
-  ]
-}
-```
-
-**最终输出格式：**
 ```markdown
-## 测试用例：TC-001
-**功能：** 邮箱登录
+# 功能测试用例
+
+## 生成统计
+- 原始用例数: 45
+- 去重后: 28
+- 去重详情见: deduplication-report.md
+
+---
+
+## TC-001: 有效邮箱登录
 **模块：** 用户认证
+**功能：** F-001 邮箱登录
 **生成器：** 等价类（正向）
 
 ### 前置条件
@@ -867,194 +756,353 @@ function selectGenerators(requirement) {
 - 用户重定向到 /dashboard
 - 显示"欢迎回来！"消息
 
-### 测试类型
-- 正向：用有效凭证登录
-
-### 需求来源
+### 需求溯源
 | 来源文件 | 行号 | 原始需求文本 |
 |----------|------|-------------|
-| `requirements/auth-prd.md` | 45-48 | "用户应能使用邮箱和密码登录系统，登录成功后跳转到仪表板" |
-| `requirements/auth-prd.md` | 52 | "邮箱格式需符合标准 email 格式规范" |
+| `requirements/auth-prd.md` | 45-48 | "用户应能使用邮箱和密码登录系统" |
+```
 
-### 生成来源
-- 等价划分（有效邮箱格式）← 来源：行 45-48
-- 边界值（标准长度）← 来源：行 52
+**Red Flags：**
+
+| 如果你在想... | 现实是... |
+|--------------|----------|
+| "先生成再说" | 不分析特征就全调用所有生成器 = 大量冗余用例 |
+| "全部调用所有生成器最安全" | 违反 Iron Law，浪费用户审核时间 |
+| "去重不重要" | 重复用例降低用户信任度 |
+| "跳过审查直接给用户" | 违反 Hard Gate，test-reviewer 必须先审查 |
+
+### Skill 4：automation-analysis（自动化可行性分析）
+
+**Iron Law：**
+> **未经用户确认的用例不准分析自动化可行性。**
+
+**前置条件：** Phase 3 (test-case-generation) 状态为 complete，且用户已确认用例
+
+**自动化等级判断标准：**
+
+| 等级 | 标准 | 示例 |
+|------|------|------|
+| `automatable` | 所有步骤可自动化，无需视觉/人工验证 | API 调用、表单提交、页面跳转 |
+| `partial` | 核心步骤可自动化，但需人工设置或最终验证 | 需要视觉验证的 UI 元素 |
+| `manual` | 需人工观察、物理设备或复杂设置 | 邮件内容验证、物理设备交互 |
+
+**输出格式（automation-analysis.md）：**
+
+```markdown
+# 自动化可行性分析
+
+## 统计
+- 总用例: 28
+- automatable: 18 (64%)
+- partial: 7 (25%)
+- manual: 3 (11%)
+
+## 详细分析
+
+| 用例ID | 名称 | 等级 | 理由 | 可自动化部分 | 需人工部分 |
+|--------|------|------|------|-------------|-----------|
+| TC-001 | 有效邮箱登录 | automatable | 全部步骤可通过 Playwright 模拟 | 步骤 1-4 | — |
+| TC-015 | 视觉元素验证 | partial | 页面跳转可自动化，视觉验证需人工 | 步骤 1-3 | 步骤 4: 视觉验证 |
+| TC-020 | 邮件通知验证 | manual | 需要实际收到邮件并验证内容 | — | 全部 |
+```
+
+### Skill 5：automation-scripting（自动化脚本生成）
+
+**Iron Law：**
+> **只为已确认且标记为 automatable/partial 的用例生成脚本。**
+
+**Hard Gate：**
+```
+<HARD-GATE>
+manual 用例不生成代码，只生成文档化的执行步骤到 manual-cases.md。
+生成的脚本必须经过 test-reviewer 审查后才能输出给用户。
+</HARD-GATE>
+```
+
+**前置条件：** Phase 4 (automation-analysis) 状态为 complete
+
+**生成规则：**
+1. `automatable` 用例 → 完整 Playwright 测试代码
+2. `partial` 用例 → 自动化部分代码 + `// HUMAN VERIFICATION NEEDED` 注释
+3. `manual` 用例 → manual-cases.md 中的详细执行步骤
+
+**代码规范：**
+- 每个测试文件对应一个模块
+- 使用 Page Object 模式
+- 每个 test 注释标记溯源：`// TC-001 | F-001 | auth-prd.md:45-48`
+- Arrange-Act-Assert 结构
+- 合理使用 data-testid 选择器
+
+**Playwright 脚本示例：**
+
+```typescript
+// auth.e2e.spec.ts
+// 模块: 用户认证
+// 生成时间: 2026-04-07
+// 来源: functional-cases.md
+
+import { test, expect } from '@playwright/test';
+
+// TC-001 | F-001 | auth-prd.md:45-48
+test('should login with valid email', async ({ page }) => {
+  // Arrange
+  await page.goto('/login');
+
+  // Act
+  await page.fill('[data-testid="email-input"]', 'test@example.com');
+  await page.fill('[data-testid="password-input"]', 'CorrectPassword123');
+  await page.click('[data-testid="login-btn"]');
+
+  // Assert
+  await expect(page).toHaveURL('/dashboard');
+  await expect(page.locator('[data-testid="welcome-msg"]')).toContainText('欢迎回来');
+});
+
+// TC-015 | F-001 | auth-prd.md:52
+test('should display welcome elements after login', async ({ page }) => {
+  // Automated part
+  await page.goto('/login');
+  await page.fill('[data-testid="email-input"]', 'test@example.com');
+  await page.fill('[data-testid="password-input"]', 'password123');
+  await page.click('[data-testid="login-btn"]');
+  await expect(page).toHaveURL('/dashboard');
+
+  // HUMAN VERIFICATION NEEDED:
+  // - Verify "Welcome back, User!" message styling is correct
+  // - Check dashboard layout renders without visual glitches
+  // - Confirm notification bell icon appears in correct position
+});
+```
+
+### Skill 6：test-reporting（测试报告生成）
+
+**前置条件：** Phase 5 (automation-scripting) 状态为 complete
+
+**报告内容结构：**
+
+```markdown
+# 测试报告: [模块名]
+
+## 执行摘要
+- 生成日期: YYYY-MM-DD
+- 需求文档: requirements/xxx.md
+- 总用例数: N
+- 自动化率: X%
+
+## 需求覆盖
+| 需求ID | 名称 | 关联用例数 | 覆盖状态 |
+|--------|------|-----------|---------|
+| F-001 | 邮箱登录 | 5 | 完整覆盖 |
+
+## 功能测试用例摘要
+[按模块分组的用例列表]
+
+## 自动化分析
+| 等级 | 数量 | 占比 |
+|------|------|------|
+| automatable | N | X% |
+| partial | N | X% |
+| manual | N | X% |
+
+## 跨模块场景
+[跨模块测试场景列表]
+
+## 自动化脚本
+[脚本文件列表及对应用例映射]
+
+## 人工测试用例
+[仅人工执行的用例列表]
+
+## 追溯矩阵
+[需求 → 用例 → 脚本 的完整映射]
+```
+
+**输出位置：** `.supertester/reports/YYYY-MM-DD-<module>.md`
+
+---
+
+## test-reviewer Agent
+
+### 设计理念
+
+> **生成器负责"创造"，审查器负责"质检"。两个角色必须分离。**
+
+test-reviewer 是一个独立的审查 agent，不依赖任何生成 skill，从审查者的角度独立评估产出物质量。
+
+### 审查触发点
+
+| 阶段 | 审查对象 | 审查文件 | 审查记录 |
+|------|---------|---------|---------|
+| Phase 2 | 需求关联分析 | cross-module-scenarios.md, implicit-requirements.md | reviews/review-association-*.md |
+| Phase 3 | 功能测试用例 | functional-cases.md | reviews/review-testcases-*.md |
+| Phase 5 | 自动化脚本 | *.spec.ts | reviews/review-scripts-*.md |
+
+### 审查协议
+
+```markdown
+# test-reviewer 审查协议
+
+## 输入
+- 被审查的阶段输出文件
+- parsed-requirements.md（作为需求基准）
+- test_plan.md（了解上下文和决策）
+
+## 审查维度
+
+### 1. 需求覆盖审查（Phase 2, 3）
+- 每个需求(F-xxx)是否都有对应的测试用例?
+- 隐含需求(IR-xxx)是否被覆盖?
+- 跨模块场景(CMS-xxx)是否完整?
+
+### 2. 用例质量审查（Phase 3）
+- 前置条件是否明确可执行?
+- 测试步骤是否清晰无歧义?
+- 预期结果是否可验证?
+- 需求溯源是否准确?
+- 子生成器选择是否合理?
+- 去重是否彻底?
+
+### 3. 脚本质量审查（Phase 5）
+- 代码是否可运行（无语法错误）?
+- 是否遵循 Playwright 最佳实践?
+- 选择器策略是否稳定 (data-testid > CSS)?
+- Arrange-Act-Assert 结构是否清晰?
+- 溯源注释是否完整（TC-xxx | F-xxx）?
+- partial 用例的 HUMAN VERIFICATION 标记是否准确?
+
+## 输出格式
+
+### 审查结果分类
+- CRITICAL: 必须修复，阻塞进入下一阶段
+- HIGH: 应该修复，影响质量
+- MEDIUM: 建议修复，改善体验
+- LOW: 可选优化
+
+### 审查记录格式
+见 reviews/review-<phase>-<timestamp>.md
+```
+
+### 审查验证循环
+
+```
+生成 skill 输出产物
+    │
+    ▼
+test-reviewer 审查
+    │
+    ├── CRITICAL issues found?
+    │       │
+    │       ├── YES → 生成 skill 修复 → 重新审查 (循环)
+    │       │
+    │       └── NO → 继续
+    │
+    ├── HIGH issues found?
+    │       │
+    │       ├── YES → 生成 skill 修复 → 重新审查 (循环)
+    │       │
+    │       └── NO → 继续
+    │
+    ▼
+审查通过 → 提交给用户确认
+```
+
+**3-Strike 升级协议：**
+
+```
+审查修复循环:
+  第 1 次: 修复 CRITICAL/HIGH issues，重新审查
+  第 2 次: 换用不同方法修复，重新审查
+  第 3 次: 停止，将问题和所有尝试记录到 test_plan.md Errors 表
+          → 请用户介入决策
+
+→ 所有尝试记录到 test_plan.md 的 Errors 表
+→ 所有审查记录保存到 reviews/ 目录
 ```
 
 ---
 
-#### 5. 自动化可行性分析器
+## 错误处理与恢复
 
-**用途：** 分析每个功能测试用例的自动化可行性。
+### 3-Strike Error Protocol
 
-**自动化等级：**
-```javascript
-{
-  level: "automatable" | "partial" | "manual",
-  reasoning: "为什么是这个等级？",
-  automatableParts: ["步骤1", "步骤2"],
-  needsHumanParts: ["步骤3 - 视觉验证"],
-  automationHints: ["使用模拟API", "设置测试数据库"]
-}
+```
+ATTEMPT 1: 诊断 & 修复
+  → 仔细阅读错误，识别根因，应用针对性修复
+
+ATTEMPT 2: 换方法
+  → 同样的错误？尝试不同的方法/工具/策略
+  → 绝不重复完全相同的失败操作
+
+ATTEMPT 3: 更广泛地反思
+  → 质疑假设，搜索解决方案，更新计划
+
+3 次失败后: 升级
+  → 解释尝试了什么，分享错误，请求用户指导
 ```
 
-**判断标准：**
-| 等级 | 标准 |
-|------|------|
-| 🤖 `automatable` | 所有步骤可自动化，无需视觉/人工验证 |
-| ⚠️ `partial` | 核心步骤可自动化，但需人工设置或最终验证 |
-| 👤 `manual` | 需人工观察、物理设备或复杂设置 |
+### Never Repeat Failures
 
----
-
-#### 6. 自动化脚本生成器
-
-**用途：** 生成特定框架的测试代码。
-
-**支持的框架：**
-| 测试类型 | 框架 | 说明 |
-|----------|------|------|
-| Web E2E 测试 | Playwright | 浏览器自动化、页面交互 |
-
-**生成流程：**
-1. 获取已确认的功能测试用例
-2. 根据用例类型和自动化等级生成 Playwright 代码：
-   - 场景流测试用例 → Playwright E2E 代码
-   - 跨模块测试用例 → Playwright E2E 代码
-3. 对于 `partial` 等级的用例：
-   - 生成自动化代码部分
-   - 标记需要人工验证的部分
-4. 对于 `manual` 用例，在文档中说明执行步骤
-
-**输出：**
-```javascript
-{
-  unitTestFile: "auth.test.ts",
-  e2eTestFile: "auth.e2e.spec.ts",
-  cases: [
-    {
-      id: "TC-001",
-      name: "should login with valid email",
-      testType: "unit",
-      status: "automatable",
-      code: `
-        test('should login with valid email', async () => {
-          // Setup
-          const mockLogin = jest.fn().mockResolvedValue({ success: true });
-
-          // Execute
-          const result = await login('test@example.com', 'password');
-
-          // Verify
-          expect(result.success).toBe(true);
-        });
-      `,
-      humanNotes: null
-    },
-    {
-      id: "TC-010",
-      name: "complete purchase flow",
-      testType: "e2e",
-      status: "automatable",
-      code: `
-        test('complete purchase flow', async ({ page }) => {
-          // Navigate to catalog
-          await page.goto('/catalog');
-          await page.click('[data-testid="product-1"]');
-
-          // Add to cart
-          await page.click('[data-testid="add-to-cart"]');
-          await expect(page.locator('[data-testid="cart-count"]')).toHaveText('1');
-
-          // Proceed to checkout
-          await page.click('[data-testid="checkout-btn"]');
-          await page.fill('[data-testid="payment-card"]', '4242424242424242');
-
-          // Complete purchase
-          await page.click('[data-testid="pay-btn"]');
-          await expect(page.locator('[data-testid="order-confirmation"]')).toBeVisible();
-        });
-      `,
-      humanNotes: null
-    },
-    {
-      id: "TC-015",
-      name: "verify welcome message visibility",
-      testType: "e2e",
-      status: "partial",
-      code: `
-        test('verify welcome message after login', async ({ page }) => {
-          // Automated part
-          await page.goto('/login');
-          await page.fill('[name="email"]', 'test@example.com');
-          await page.fill('[name="password"]', 'password123');
-          await page.click('[data-testid="login-btn"]');
-          await expect(page).toHaveURL('/dashboard');
-
-          // HUMAN VERIFICATION NEEDED:
-          // - Verify "Welcome back, User!" message is visible
-          // - Check dashboard layout renders correctly
-          // - Confirm notification bell icon shows
-        });
-      `,
-      humanNotes: "需要人工验证页面视觉元素是否正确显示"
-    }
-  ]
-}
+```
+if action_failed:
+    next_action != same_action
+    record_attempt_in(test_plan.md)
 ```
 
----
+### 错误场景处理
 
-#### 7. 输出格式化器
-
-**用途：** 以适当格式呈现结果。
-
-**混合输出模式：**
-- **终端：** 摘要表格、关键指标、确认提示
-- **报告文件：** 详细 Markdown 报告，包含：
-  - 执行摘要
-  - 需求概览
-  - 功能测试用例（全部）
-  - 自动化脚本（按自动化等级标记）
-  - 人工测试用例（分离）
-
-**报告位置：** `reports/testing-agent/YYYY-MM-DD-<task-type>.md`
+| 错误场景 | 处理方式 |
+|----------|----------|
+| 需求文档未找到 | 提示用户提供正确路径，记录到 progress.md |
+| 未找到可测试项 | 报告并建议改进文档格式，记录到 findings.md |
+| 模糊项过多（>10） | 按模块分组，分批澄清，每批 ≤3 问 |
+| 未检测到测试框架 | 提示用户指定或通过 package.json 自动检测 |
+| 生成质量不达标 | 进入审查修复循环（3-Strike） |
+| 会话中断 | session-catchup.py 自动恢复，从 test_plan.md 续接 |
+| 配置无效 | 使用默认值，警告用户 |
 
 ---
 
 ## 用户交互模式
 
-### 模式一：需求优先测试
+### 模式一：完整流程（需求到报告）
 
 ```
-用户: /test generate for requirements/auth-prd.md
-  → 意图: parse
-  → 输出: 解析后的需求，包含模块分解
-  → 如有需要则澄清（模糊项）
-  → 展示功能测试用例供审核
-  → 等待确认
-  → 生成带自动化标记的自动化脚本
+用户: 分析 requirements/auth-prd.md 并生成测试
+  → [Skill 0] 初始化 .supertester/
+  → [Skill 1] 解析需求 → 澄清模糊项 → parsed-requirements.md
+  → [Skill 2] 关联分析 → test-reviewer 审查 → 用户确认
+  → [Skill 3] 生成用例 → test-reviewer 审查 → 用户确认
+  → [Skill 4] 自动化分析 → automation-analysis.md → 用户确认
+  → [Skill 5] 生成脚本 → test-reviewer 审查 → *.spec.ts
+  → [Skill 6] 生成报告 → reports/2026-04-07-auth.md
 ```
 
-### 模式二：直接功能用例生成
+### 模式二：从中间阶段开始
 
 ```
-用户: /test functional for "login with email"
-  → 意图: functional
-  → 直接生成功能测试用例
-  → 展示供用户审核
+用户: 为已有的功能用例生成自动化脚本
+  → [Skill 0] 检测 .supertester/test-cases/functional-cases.md 存在
+  → [Skill 4] 自动化分析
+  → [Skill 5] 生成脚本
 ```
 
-### 模式三：需求问答
+### 模式三：恢复中断的会话
+
+```
+用户: (新会话)
+  → [SessionStart Hook] 检测到 .supertester/ 存在
+  → 读取 test_plan.md：Phase 2 in_progress
+  → 提示: "检测到未完成的测试任务，当前在 Phase 2（需求关联分析）。继续？"
+  → 用户: 继续
+  → [Skill 2] 从断点恢复
+```
+
+### 模式四：问答查询
 
 ```
 用户: checkout 模块需要哪些测试？
-  → 意图: query
-  → 输出: 建议的测试用例列表
-
-用户: 澄清注册功能的密码要求
-  → 意图: clarify
-  → 输出: 提出具体的澄清问题
+  → 直接回答，参考 .supertester/ 中已有的分析结果
+  → 不触发完整流程
 ```
 
 ---
@@ -1067,7 +1115,7 @@ function selectGenerators(requirement) {
 |----|------|--------|
 | FR-1.1 | 解析包含多个模块的大型 markdown 文件 | 必须 |
 | FR-1.2 | 提取功能、验收标准、边界条件 | 必须 |
-| FR-1.3 | 构建结构化需求树 | 必须 |
+| FR-1.3 | 构建结构化需求树并持久化到 parsed-requirements.md | 必须 |
 | FR-1.4 | 识别不清晰/模糊的项 | 必须 |
 | FR-1.5 | 支持多种需求格式 | 应该 |
 
@@ -1078,67 +1126,80 @@ function selectGenerators(requirement) {
 | FR-2.1 | 检测模糊需求 | 必须 |
 | FR-2.2 | 生成有针对性的澄清问题 | 必须 |
 | FR-2.3 | 尽可能支持多选答案 | 应该 |
-| FR-2.4 | 记录澄清内容 | 必须 |
+| FR-2.4 | 记录澄清内容到 clarifications.json | 必须 |
+| FR-2.5 | 支持澄清会话暂停与恢复 | 必须 |
 
-### FR-3: 功能测试用例生成
-
-| ID | 需求 | 优先级 |
-|----|------|--------|
-| FR-3.1 | 生成人工可读的测试用例 | 必须 |
-| FR-3.2 | 包含前置条件、步骤、预期结果 | 必须 |
-| FR-3.3 | 使用专门的子生成器处理不同用例类型 | 必须 |
-| FR-3.4 | 支持等价划分（正向/反向） | 必须 |
-| FR-3.5 | 支持边界值分析 | 必须 |
-| FR-3.6 | 支持异常/错误场景生成 | 必须 |
-| FR-3.7 | 支持状态转换测试 | 必须 |
-| FR-3.8 | 支持场景流（单模块内端到端流程） | 必须 |
-| FR-3.9 | 支持决策表（复杂业务规则） | 必须 |
-| FR-3.10 | 支持安全测试生成 | 必须 |
-| FR-3.11 | 支持性能测试生成 | 应该 |
-| FR-3.12 | 对生成的测试用例去重（单模块内） | 必须 |
-| FR-3.13 | 映射到源代码模块/函数 | 应该 |
-| FR-3.14 | 按模块/功能分组 | 必须 |
-
-### FR-3.5: 需求关联分析（跨模块）
+### FR-3: 需求关联分析
 
 | ID | 需求 | 优先级 |
 |----|------|--------|
-| FR-3.5.1 | 分析模块间的依赖关系，构建依赖图 | 必须 |
-| FR-3.5.2 | 从需求文本中挖掘隐含需求场景 | 必须 |
-| FR-3.5.3 | 生成跨模块的关键路径场景 | 必须 |
-| FR-3.5.4 | 生成跨模块的错误传导场景 | 必须 |
-| FR-3.5.5 | 生成跨模块的数据同步场景 | 应该 |
-| FR-3.5.6 | 生成跨模块的并发一致性场景 | 应该 |
-| FR-3.5.7 | 跨模块测试用例去重 | 必须 |
+| FR-3.1 | 分析模块间的依赖关系，持久化到 module-dependencies.md | 必须 |
+| FR-3.2 | 从需求文本中挖掘隐含需求，持久化到 implicit-requirements.md | 必须 |
+| FR-3.3 | 生成跨模块场景，持久化到 cross-module-scenarios.md | 必须 |
+| FR-3.4 | 经过 test-reviewer 审查 | 必须 |
+| FR-3.5 | 用户确认后才能进入下一阶段 | 必须 |
 
-### FR-4: 自动化可行性分析
+### FR-4: 功能测试用例生成
 
 | ID | 需求 | 优先级 |
 |----|------|--------|
-| FR-4.1 | 分析每个测试用例的自动化潜力 | 必须 |
-| FR-4.2 | 分类为 automatable/partial/manual | 必须 |
-| FR-4.3 | 解释分类原因 | 必须 |
-| FR-4.4 | 为部分可自动化的用例建议自动化方法 | 应该 |
+| FR-4.1 | 生成人工可读的测试用例 | 必须 |
+| FR-4.2 | 包含前置条件、步骤、预期结果 | 必须 |
+| FR-4.3 | 按需求特征智能选择子生成器 | 必须 |
+| FR-4.4 | 支持 8 种子生成器 | 必须 |
+| FR-4.5 | 对生成的测试用例去重 | 必须 |
+| FR-4.6 | 每个用例包含需求溯源（文件+行号） | 必须 |
+| FR-4.7 | 经过 test-reviewer 审查 | 必须 |
+| FR-4.8 | 持久化到 functional-cases.md | 必须 |
 
-### FR-5: 自动化脚本生成
-
-| ID | 需求 | 优先级 |
-|----|------|--------|
-| FR-5.1 | 生成 Playwright 代码（Web E2E） | 必须 |
-| FR-5.2 | 遵循项目约定的模式和规范 | 必须 |
-| FR-5.3 | 应用适当的 page object 模式 | 必须 |
-| FR-5.4 | 在输出中标记自动化等级 | 必须 |
-| FR-5.5 | 分离仅人工测试用例 | 必须 |
-
-### FR-6: 报告生成
+### FR-5: 自动化可行性分析
 
 | ID | 需求 | 优先级 |
 |----|------|--------|
-| FR-6.1 | 生成 Markdown 报告文件 | 必须 |
-| FR-6.2 | 包含所有功能测试用例 | 必须 |
-| FR-6.3 | 包含生成的自动化脚本 | 必须 |
-| FR-6.4 | 清晰标记自动化等级 | 必须 |
-| FR-6.5 | 创建摘要部分 | 必须 |
+| FR-5.1 | 分析每个测试用例的自动化潜力 | 必须 |
+| FR-5.2 | 分类为 automatable/partial/manual | 必须 |
+| FR-5.3 | 解释分类原因 | 必须 |
+| FR-5.4 | 持久化到 automation-analysis.md | 必须 |
+
+### FR-6: 自动化脚本生成
+
+| ID | 需求 | 优先级 |
+|----|------|--------|
+| FR-6.1 | 生成 Playwright 代码（Web E2E） | 必须 |
+| FR-6.2 | 遵循项目约定的模式和规范 | 必须 |
+| FR-6.3 | 应用 Page Object 模式 | 必须 |
+| FR-6.4 | 在代码注释中标记溯源（TC-xxx \| F-xxx） | 必须 |
+| FR-6.5 | 分离 manual 用例到 manual-cases.md | 必须 |
+| FR-6.6 | 经过 test-reviewer 审查 | 必须 |
+
+### FR-7: 报告生成
+
+| ID | 需求 | 优先级 |
+|----|------|--------|
+| FR-7.1 | 生成 Markdown 报告文件 | 必须 |
+| FR-7.2 | 包含完整追溯矩阵 | 必须 |
+| FR-7.3 | 包含所有阶段的统计摘要 | 必须 |
+| FR-7.4 | 持久化到 reports/ 目录 | 必须 |
+
+### FR-8: 文件持久化与会话恢复
+
+| ID | 需求 | 优先级 |
+|----|------|--------|
+| FR-8.1 | 自动创建 .supertester/ 目录和 3 个核心文件 | 必须 |
+| FR-8.2 | 每个阶段的输出持久化到对应文件 | 必须 |
+| FR-8.3 | 遵守 2-Action Rule | 必须 |
+| FR-8.4 | 支持跨会话恢复 | 必须 |
+| FR-8.5 | Stop hook 防止过早退出 | 必须 |
+
+### FR-9: 独立审查
+
+| ID | 需求 | 优先级 |
+|----|------|--------|
+| FR-9.1 | test-reviewer 独立审查 Phase 2/3/5 的产出 | 必须 |
+| FR-9.2 | 审查结果分类为 CRITICAL/HIGH/MEDIUM/LOW | 必须 |
+| FR-9.3 | CRITICAL/HIGH 必须修复后重新审查 | 必须 |
+| FR-9.4 | 审查记录持久化到 reviews/ 目录 | 必须 |
+| FR-9.5 | 3-Strike 升级到用户 | 必须 |
 
 ---
 
@@ -1147,289 +1208,53 @@ function selectGenerators(requirement) {
 | ID | 需求 | 说明 |
 |----|------|------|
 | NFR-1 | 处理长达 10,000 行的需求文档 | 全面解析大型文档 |
-| NFR-2 | 支持 monorepo 项目结构 | 多个 `package.json` 位置 |
-| NFR-3 | 通过 `testing-agent.config.js` 可配置 | 覆盖默认值 |
-| NFR-4 | 任何生成前必须先澄清 | 永不跳过澄清 |
-| NFR-5 | 自动化前必须用户确认 | 两阶段是强制性的 |
-| NFR-6 | 对话状态必须持久化 | 支持会话中断和恢复 |
-| NFR-7 | 会话恢复后从断点继续 | 不丢失任何已澄清的内容 |
-
----
-
-## 配置 Schema
-
-```javascript
-// testing-agent.config.js
-module.exports = {
-  // 项目特定的测试约定
-  conventions: {
-    testDirectory: "__tests__",  // 或 "tests"，或按包
-    fileSuffix: ".test",          // 或 ".spec"
-    mockDirectory: "__mocks__"
-  },
-
-  // 源文件位置
-  sources: {
-    include: ["src/**/*.ts", "lib/**/*.ts"],
-    exclude: ["**/*.d.ts", "**/node_modules/**"]
-  },
-
-  // 需求解析
-  requirements: {
-    // 识别可测试项的模式
-    featureKeywords: ["should", "must", "shall", "when", "if"],
-    boundaryKeywords: ["empty", "null", "undefined", "max", "min", "first", "last"],
-    // 需求文档的文件模式
-    docPatterns: ["**/requirements/**/*.md", "**/*spec*.md", "**/*prd*.md"]
-  },
-
-  // 澄清行为
-  clarification: {
-    askBeforeGeneration: true,    // 始终澄清模糊项
-    maxQuestionsPerRound: 3       // 不要让用户应接不暇
-  },
-
-  // 两阶段工作流
-  workflow: {
-    // 功能用例必须在自动化前确认
-    requireConfirmation: true,
-    // 小改动可自动生成，大改动需确认
-    autonomyThresholds: {
-      newTestCases: 5,            // < 5 个用例 = 自动生成
-      newFiles: 1                  // 新文件 = 需确认
-    }
-  },
-
-  // 报告输出
-  reports: {
-    directory: "reports/testing-agent",
-    format: "markdown"
-  }
-}
-```
-
----
-
-## 文件结构
-
-```
-software-testing-agent/
-├── SKILL.md                    # 主技能文件
-├── README.md                   # 使用文档
-├── src/
-│   ├── router.js              # 意图路由逻辑
-│   ├── requirements/
-│   │   ├── parser.js          # 解析需求文档
-│   │   ├── extractor.js       # 提取可测试项
-│   │   ├── clarifier.js       # 处理模糊需求
-│   │   ├── session.js         # 对话状态持久化与恢复
-│   │   └── association.js     # 需求关联分析器
-│   │       ├── dependency.js  # 模块依赖分析
-│   │       ├── implicit.js    # 隐含需求挖掘
-│   │       └── crossModule.js # 跨模块场景生成
-│   ├── functional/
-│   │   ├── index.js           # FCG 编排器
-│   │   ├── equivalence.js     # 等价类生成器
-│   │   ├── boundary.js        # 边界值生成器
-│   │   ├── exception.js       # 异常场景生成器
-│   │   ├── state.js           # 状态转换生成器
-│   │   ├── scenario.js        # 场景流生成器
-│   │   ├── decisionTable.js   # 决策表生成器
-│   │   ├── security.js        # 安全测试生成器
-│   │   ├── performance.js     # 性能测试生成器
-│   │   ├── deduplicator.js   # 去重引擎
-│   │   └── templates/         # 用例模板
-│   ├── automation/
-│   │   ├── analyzer.js        # 分析自动化可行性
-│   │   ├── playwright.js     # Playwright E2E 代码生成
-│   │   └── markers.js        # 标记自动化等级
-│   ├── formatter/
-│   │   ├── terminal.js        # 终端输出
-│   │   └── report.js          # 报告生成
-│   └── config.js              # 配置加载器
-├── sessions/                   # 对话状态存储目录
-│   └── clarify-session-*.json  # 澄清会话状态文件
-└── testing-agent.config.js     # 默认配置
-```
-
----
-
-## 内部 API 设计
-
-### `router.parseIntent(input)`
-
-**输入：** 用户消息字符串
-
-**输出：**
-```javascript
-{
-  intent: "parse" | "clarify" | "functional" | "automate" | "analyze" | "query",
-  confidence: 0.0-1.0,
-  parameters: {
-    target?: string,        // 文件路径或模块名
-    scope?: string,         // "file" | "module" | "project"
-    options?: object
-  }
-}
-```
-
-### `requirements.parse(docPath)`
-
-**输入：** 需求文档路径
-
-**输出：**
-```javascript
-{
-  modules: [{ name, features: [...] }],
-  ambiguousItems: [{ module, feature, unclear }],
-  statistics: { totalFeatures, totalAC, ambiguityScore }
-}
-```
-
-### `requirements.clarify(ambiguousItems)`
-
-**输入：** 模糊项列表
-
-**输出：**
-```javascript
-{
-  clarifications: [
-    {
-      question: "最大登录尝试次数是多少？",
-      options: ["3次", "5次", "无限次"],
-      selected: null  // 用户填写
-    }
-  ]
-}
-```
-
-### `functional.generate(confirmedRequirements)`
-
-**输入：** 已澄清的需求
-
-**输出：**
-```javascript
-{
-  testCases: [
-    {
-      id: "TC-001",
-      module: "认证",
-      feature: "登录",
-      generatorType: "equivalence",        // 创建此用例的生成器
-      subCategory: "positive",               // 等价类子类型
-      preconditions: [...],
-      steps: [...],
-      expectedResult: "...",
-      tags: ["critical", "p0"],
-      sourceRequirement: "F-001",           // 映射到源需求 ID
-      
-      // 需求来源追溯
-      requirementSource: {
-        file: "requirements/auth-prd.md",
-        lines: [45, 46, 47, 48],          // 原始需求文本所在行号
-        rawText: "用户应能使用邮箱和密码登录系统，登录成功后跳转到仪表板",
-        generator: "equivalence"            // 由哪个生成器基于此来源生成
-      }
-    }
-  ],
-  // 去重报告
-  deduplication: {
-    originalCount: 50,
-    finalCount: 32,
-    removed: [
-      { id: "TC-010", reason: "subset_duplicate", absorbedBy: "TC-003" }
-    ]
-  },
-  requiresConfirmation: true
-}
-```
-
-### `automation.analyze(functionalCases)`
-
-**输入：** 功能测试用例
-
-**输出：**
-```javascript
-{
-  analysis: [
-    {
-      caseId: "TC-001",
-      level: "automatable",
-      reasoning: "所有步骤可通过API调用",
-      automatableParts: ["步骤1-4"],
-      needsHumanParts: null
-    }
-  ]
-}
-```
-
-### `automation.generate(cases, analysis)`
-
-**输入：** 功能用例 + 自动化分析
-
-**输出：**
-```javascript
-{
-  e2eTests: [
-    {
-      caseId: "TC-010",
-      framework: "playwright",
-      code: "test('...', async ({ page }) => { ... })",
-      status: "automatable",
-      humanNotes: null
-    }
-  ],
-  manualCases: [
-    {
-      caseId: "TC-005",
-      status: "manual",
-      instructions: "...",
-      humanNotes: "需要物理设备交互"
-    }
-  ]
-}
-```
-
----
-
-## 错误处理
-
-| 错误场景 | 处理方式 |
-|----------|----------|
-| 需求文档未找到 | 提示用户提供正确路径 |
-| 未找到可测试项 | 报告并建议改进文档格式 |
-| 模糊项过多（>10） | 按模块分组，分批澄清 |
-| 未检测到测试框架 | 提示用户指定或通过 package.json 自动检测 |
-| AI 生成失败 | 回退到基于模板的生成 |
-| 配置无效 | 使用默认值，警告用户 |
+| NFR-2 | 支持 monorepo 项目结构 | 多个 package.json 位置 |
+| NFR-3 | 零代码依赖 | 纯 Markdown skill + Bash 脚本 |
+| NFR-4 | 跨平台兼容 | Claude Code / Cursor / OpenCode / Gemini CLI |
+| NFR-5 | 所有阶段产出持久化到本地文件 | 可追溯、可审计 |
+| NFR-6 | 对话状态持久化 | 支持会话中断和恢复 |
+| NFR-7 | 会话恢复后从断点继续 | 不丢失任何已完成的工作 |
+| NFR-8 | Hooks 自动注入上下文 | 防止 agent 目标漂移 |
 
 ---
 
 ## Phase 1 范围外
 
-- Playwright 底层脚本细节 - 只生成用例级 E2E 脚本，不涉及底层 API 调用细节
-- 测试执行编排 - 不执行测试，只生成用例
-- CI/CD 集成 - 不做 CI/CD 集成
-- 快照测试 - 不生成快照测试
-- Mock 文件生成 - 不自动生成 mock 文件（由开发者手动维护）
-- 代码覆盖率分析（独立功能）- 覆盖率分析是独立功能
+- 测试执行编排 — 不执行测试，只生成用例和脚本
+- CI/CD 集成 — 不做 CI/CD 集成
+- 快照测试 — 不生成快照测试
+- Mock 文件生成 — 不自动生成 mock 文件
+- 代码覆盖率分析 — 独立功能，未来增强
+- MCP Server — Phase 1 使用纯 prompt 控制，未来可加 MCP 做程序化校验
 
 ---
 
 ## 未来增强
 
-- FR-7: 测试执行与失败分析
-- FR-8: 性能分析（慢测试检测）
-- FR-9: 变异测试集成
-- FR-10: 属性测试（模糊测试）
-- FR-11: 现有代码覆盖率缺口分析
+- FR-10: MCP Server 增强（程序化阶段校验、覆盖率阈值检查）
+- FR-11: 测试执行与失败分析
+- FR-12: 性能分析（慢测试检测）
+- FR-13: 变异测试集成
+- FR-14: 属性测试（模糊测试）
+- FR-15: 现有代码覆盖率缺口分析
+- FR-16: 更多自动化框架支持（Cypress, Selenium）
 
 ---
 
-## 附录：参考技能
+## 附录
 
-本设计遵循以下技能建立的模式：
+### A. 参考项目
 
-- `brainstorming` - 澄清优先方法、用户确认环节
-- `systematic-debugging` - 结构化分析方法
-- `test-driven-development` - 测试用例质量标准
+| 项目 | 借鉴内容 |
+|------|---------|
+| [Superpowers](https://github.com/obra/superpowers) | Skill 行为塑造模式：Iron Law, Hard Gate, Red Flags, 验证循环 |
+| [planning-with-files](https://github.com/nickarino/planning-with-files) | 3 文件持久化, Hooks 注意力操控, 2-Action Rule, 会话恢复 |
+| [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | 架构参考（未采用，但指导了技术选型决策） |
+
+### B. 参考技能
+
+- `brainstorming` — 澄清优先方法、用户确认环节
+- `systematic-debugging` — 3-Strike Error Protocol, 结构化分析方法
+- `test-driven-development` — 测试用例质量标准, RED-GREEN 验证门
+- `verification-before-completion` — 验证后才能声明完成
+- `subagent-driven-development` — 两阶段审查循环（spec + quality）
