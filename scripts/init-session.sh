@@ -30,9 +30,15 @@ cp "${PLUGIN_ROOT}/templates/progress.md" "${SUPERTESTER_DIR}/progress.md"
 
 # Set session date in progress.md
 TODAY=$(date +%Y-%m-%d)
-sed -i "s/\[DATE\]/${TODAY}/" "${SUPERTESTER_DIR}/progress.md" 2>/dev/null || \
-    sed "s/\[DATE\]/${TODAY}/" "${SUPERTESTER_DIR}/progress.md" > "${SUPERTESTER_DIR}/progress.md.tmp" && \
+if sed -i'' "s/\[DATE\]/${TODAY}/" "${SUPERTESTER_DIR}/progress.md" 2>/dev/null; then
+    : # sed -i worked (Linux/macOS)
+elif sed -i '' "s/\[DATE\]/${TODAY}/" "${SUPERTESTER_DIR}/progress.md" 2>/dev/null; then
+    : # sed -i '' worked (BSD/macOS)
+else
+    # Fallback: use temp file
+    sed "s/\[DATE\]/${TODAY}/" "${SUPERTESTER_DIR}/progress.md" > "${SUPERTESTER_DIR}/progress.md.tmp"
     mv "${SUPERTESTER_DIR}/progress.md.tmp" "${SUPERTESTER_DIR}/progress.md"
+fi
 
 echo "Initialized .supertester/ session at ${SUPERTESTER_DIR}"
 echo "Core files:"

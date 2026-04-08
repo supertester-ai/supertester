@@ -22,7 +22,7 @@ if [ -f ".supertester/test_plan.md" ]; then
     current_phase=$(grep -m1 "^## Current Phase" -A1 ".supertester/test_plan.md" 2>/dev/null | tail -1 || echo "Unknown")
 
     # Extract current phase's Iron Law reminder based on phase number
-    phase_num=$(echo "$current_phase" | grep -oP '\d+' || echo "0")
+    phase_num=$(echo "$current_phase" | grep -oE '[0-9]+' | head -1 || echo "0")
 
     iron_law=""
     case "$phase_num" in

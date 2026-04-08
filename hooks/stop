@@ -17,8 +17,10 @@ escape_for_json() {
 context=""
 
 if [ -f ".supertester/test_plan.md" ]; then
-    TOTAL=$(grep -c "### Phase" ".supertester/test_plan.md" 2>/dev/null || echo "0")
-    COMPLETE=$(grep -c '^\- \*\*Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null || echo "0")
+    TOTAL=$(grep -c "### Phase" ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
+    TOTAL="${TOTAL:-0}"
+    COMPLETE=$(grep -c 'Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
+    COMPLETE="${COMPLETE:-0}"
 
     if [ "$TOTAL" -eq "$COMPLETE" ] && [ "$TOTAL" -gt 0 ]; then
         context="<STOP-CHECK>\\nAll ${TOTAL}/${TOTAL} phases complete. Safe to stop.\\n</STOP-CHECK>"
