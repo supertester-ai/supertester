@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Stop hook for supertester plugin
+# Verify all phases are complete before allowing agent to stop
+
+set -euo pipefail
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+context=""
+
+if [ -f ".supertester/test_plan.md" ]; then
+    TOTAL=$(grep -c "### Phase" ".supertester/test_plan.md" 2>/dev/null || echo "0")
+    COMPLETE=$(grep -c '^\- \*\*Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null || echo "0")
+
+    if [ "$TOTAL" -eq "$COMPLETE" ] && [ "$TOTAL" -gt 0 ]; then
+        context="<STOP-CHECK>\\nAll ${TOTAL}/${TOTAL} phases complete. Safe to stop.\\n</STOP-CHECK>"
+    else
+        # Get list of incomplete phases
+        incomplete=$(grep -B2 '^\- \*\*Status:\*\* \(pending\|in_progress\)' ".supertester/test_plan.md" 2>/dev/null | grep "### Phase" || echo "unknown")
+        incomplete_escaped=$(escape_for_json "$incomplete")
+        context="<STOP-CHECK>\\nWARNING: Only ${COMPLETE}/${TOTAL} phases complete.\\nIncomplete phases:\\n${incomplete_escaped}\\nContinue working or ask user to confirm early stop.\\n</STOP-CHECK>"
+    fi
+fi
+
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "$context"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "Stop",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+else
+  printf '{\n  "additionalContext": "%s"\n}\n' "$context"
+fi
+
+exit 0

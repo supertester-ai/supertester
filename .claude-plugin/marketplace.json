@@ -1,0 +1,15 @@
+{
+  "name": "supertester-dev",
+  "description": "Development marketplace for Supertester testing workflow plugin",
+  "owner": {
+    "name": "supertester"
+  },
+  "plugins": [
+    {
+      "name": "supertester",
+      "description": "AI-driven software testing workflow plugin: from requirements to Playwright E2E scripts",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}

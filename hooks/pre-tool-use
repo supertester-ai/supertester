@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# PreToolUse hook for supertester plugin
+# Before Write/Edit/Bash: re-read goal and current phase from test_plan.md
+
+set -euo pipefail
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+context=""
+
+if [ -f ".supertester/test_plan.md" ]; then
+    # Read first 30 lines (Goal + Current Phase + phase list)
+    plan_head=$(head -30 ".supertester/test_plan.md" 2>/dev/null || echo "")
+    plan_escaped=$(escape_for_json "$plan_head")
+
+    context="<PRE-TOOL-REMINDER>\\nBefore writing, review your goal and current phase:\\n${plan_escaped}\\n</PRE-TOOL-REMINDER>"
+fi
+
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "$context"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PreToolUse",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+else
+  printf '{\n  "additionalContext": "%s"\n}\n' "$context"
+fi
+
+exit 0

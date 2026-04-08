@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# UserPromptSubmit hook for supertester plugin
+# Injects current phase context from test_plan.md on every user message
+
+set -euo pipefail
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+context=""
+
+# Only inject if .supertester/ session exists
+if [ -f ".supertester/test_plan.md" ]; then
+    # Extract current phase
+    current_phase=$(grep -m1 "^## Current Phase" -A1 ".supertester/test_plan.md" 2>/dev/null | tail -1 || echo "Unknown")
+
+    # Extract current phase's Iron Law reminder based on phase number
+    phase_num=$(echo "$current_phase" | grep -oP '\d+' || echo "0")
+
+    iron_law=""
+    case "$phase_num" in
+        1) iron_law="Iron Law: 不理解需求，就不准生成任何测试。" ;;
+        2) iron_law="Iron Law: 不分析关联，就不准生成用例。" ;;
+        3) iron_law="Iron Law: 按需求特征选择生成器，不盲目全部调用。" ;;
+        4) iron_law="Iron Law: 未经用户确认的用例不准分析自动化可行性。" ;;
+        5) iron_law="Iron Law: 只为已确认且标记为 automatable/partial 的用例生成脚本。" ;;
+        6) iron_law="" ;;
+        *) iron_law="" ;;
+    esac
+
+    reminder="<PHASE-CONTEXT>\\nCurrent: ${current_phase}\\n${iron_law}\\nRemember: Check test_plan.md before major decisions. Follow 2-Action Rule.\\n</PHASE-CONTEXT>"
+    context=$(escape_for_json "$reminder")
+fi
+
+# Output empty context if no session
+if [ -z "$context" ]; then
+    context=""
+fi
+
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "$context"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+else
+  printf '{\n  "additionalContext": "%s"\n}\n' "$context"
+fi
+
+exit 0
