@@ -1,130 +1,175 @@
 ---
 name: test-reporting
-description: Use when generating the final test report - aggregates all phase outputs into a comprehensive report with traceability matrix
+description: Use when generating the final test report - aggregates all phase outputs into a comprehensive report with traceability, coverage-dimension analysis, retained manual assets, and clear gap statements
 ---
 
-# Skill 6: 测试报告生成
+# Skill 6: Test Reporting
 
 ## Iron Law
 
-> **测试报告不是数量汇总，而是覆盖说明。**
-> 如果报告只统计测试用例和自动化率，却不能说明覆盖维度、关键测试资产保留情况和剩余缺口，这份报告就是不完整的。
+> A test report is not a count summary; it is a coverage explanation.
+> If the report cannot explain what is covered, what is intentionally retained for manual verification, and what remains partial or missing, the report is incomplete.
 
-## 前置条件
+## Preconditions
 
-- Phase 5 (automation-scripting) Status: **complete**
+- Phase 5 status is `complete`
 
-## 流程
+## Goal
 
-```
-全部阶段输出
+Produce a report that makes the test outcome decision-ready by showing:
+
+- requirement coverage
+- coverage dimensions
+- preserved high-value assets
+- automation boundaries
+- retained manual or partial verification areas
+- remaining gaps and next actions
+
+## Workflow
+
+```text
+All phase outputs
     |
     v
-汇总统计
+Aggregate counts and mappings
     |
     v
-覆盖维度分析 + 关键资产保留分析 + gap 分析
+Analyze coverage dimensions + preserved assets + manual retention + gaps
     |
     v
-生成追溯矩阵
+Build traceability matrix
     |
     v
-生成报告 -> reports/YYYY-MM-DD-<module>.md
+Write report -> reports/YYYY-MM-DD-<module>.md
     |
     v
-更新 test_plan.md Phase 6 -> complete
+Update test_plan.md Phase 6 -> complete
 ```
 
-## 报告内容
+## Required Report Sections
 
-报告模板见 @report-template.md
+The report must include:
 
-### 必须包含的章节
+1. **Executive Summary**
+2. **Requirement Coverage**
+3. **Coverage Dimensions**
+4. **High-Value Asset Preservation**
+5. **Functional Test Case Summary**
+6. **Automation Analysis**
+7. **Cross-Module Scenarios**
+8. **Automation Scripts**
+9. **Retained Manual / Partial Verification**
+10. **Gap Analysis**
+11. **Traceability Matrix**
+12. **Review History**
 
-1. **执行摘要** — 日期、需求文档、总用例数、自动化率
-2. **需求覆盖** — 每个 F-xxx / IR-xxx / CMS-xxx 对应多少用例、覆盖状态
-3. **覆盖维度摘要** — 行为、规则、内容、状态/数据、集成、证据链等维度的覆盖情况
-4. **关键测试资产保留情况** — 哪些规则、列表、内容、状态断言、契约被明确保留
-5. **功能测试用例摘要** — 按模块分组的用例列表
-6. **自动化分析** — automatable/partial/manual 统计，以及为什么保留人工测试
-7. **跨模块场景** — CMS-xxx 场景列表
-8. **自动化脚本** — spec 文件列表及用例映射
-9. **人工测试用例** — manual 用例列表
-10. **Gap 分析** — 已覆盖、保留、遗漏、建议补强项
-11. **追溯矩阵** — 需求 -> 用例 -> 脚本 的完整映射
-12. **审查记录摘要** — test-reviewer 各阶段审查结果
+## New P1 Reporting Rule: Retained Manual Assets Are First-Class Output
 
-## 追溯矩阵格式
+Do not treat manual or partial coverage as a leftover list.
 
-```markdown
-## Traceability Matrix
+Whenever the workflow preserves assets as manual or partial, the report must explicitly explain:
 
-| Requirement | Test Cases | Script | Automation | Status |
-|-------------|-----------|--------|------------|--------|
-| F-001: Login | TC-001, TC-002, TC-003 | auth.e2e.spec.ts | automatable | covered |
-| F-002: Logout | TC-010 | auth.e2e.spec.ts | automatable | covered |
-| IR-001: Redirect | TC-005 | auth.e2e.spec.ts | automatable | covered |
-| CMS-001: Full flow | TC-030 | checkout.e2e.spec.ts | partial | covered |
-```
+- which asset was retained
+- why it was not fully automated
+- whether it is still covered manually
+- whether the limitation is intentional or still a gap
 
-## 覆盖维度格式
+This rule is generic and applies across products. It is not limited to visual assets.
 
-```markdown
-## Coverage Dimensions
+## Report Content Rules
 
-| Dimension | Status | Evidence | Notes |
-|-----------|--------|----------|-------|
-| Behavior | covered | functional-cases.md | 核心流程与异常路径已覆盖 |
-| Rules / Enumerations | partial | functional-cases.md | 仍有部分完整列表待补 |
-| Content | covered | functional-cases.md, manual-cases.md | 关键内容已保留人工验证 |
-| State / Data | covered | functional-cases.md | 状态断言已纳入核心用例 |
-| Integration | partial | automation-analysis.md | 外部系统异常矩阵仍待补 |
-| Evidence Chain | covered | cross-module-scenarios.md | 多观测面验证场景已建立 |
-```
+### 1. Requirement Coverage
 
-## Gap 分析格式
+For each `F-xxx`, `IR-xxx`, and `CMS-xxx`, report:
 
-```markdown
-## Gap Analysis
+- linked test cases
+- automation level
+- coverage status
 
-### Covered
-- [已经有明确覆盖的能力或维度]
+### 2. Coverage Dimensions
 
-### Preserved Manual Coverage
-- [保留人工测试的资产/原因]
+At minimum, evaluate:
 
-### Missing or Partial
-- [当前仍缺失或仅部分覆盖的项]
+- behavior
+- rules / enumerations
+- content fidelity
+- process feedback
+- interruption / recovery
+- history / list interaction
+- state / data
+- integration
+- evidence chain
+- contract content
+- visual / media handling
 
-### Recommended Next Actions
-1. [建议补强项]
-2. [建议补强项]
-```
+If a dimension has only behavior coverage but weak evidence coverage, mark it `partial`, not `covered`.
 
-## 输出位置
+### 3. High-Value Asset Preservation
 
-`.supertester/reports/YYYY-MM-DD-<module>.md`
+Summarize how the workflow preserved:
 
-如果涉及多个模块，可以：
-- 生成一个汇总报告: `YYYY-MM-DD-summary.md`
-- 每个模块一个详细报告: `YYYY-MM-DD-<module>.md`
+- copy and content assets
+- rules, matrices, lists, enums
+- process-state assets
+- interruption/recovery behaviors
+- history/list behaviors
+- prompt/schema/path/template contracts
+- visual/media assets
+- PRD-external business assets
 
-## 步骤
+### 4. Retained Manual / Partial Verification
 
-1. 读取所有阶段输出文件
-2. 汇总统计数据
-3. 汇总覆盖维度与关键测试资产保留情况
-4. 明确哪些能力已自动化，哪些被有意保留为人工验证
-5. 构建追溯矩阵（从 F-xxx 到 TC-xxx 到 *.spec.ts）
-6. 生成 gap 分析：已覆盖 / 保留 / 缺失 / 建议补强
-7. 按模板生成报告
-8. 更新 test_plan.md Phase 6 -> complete
-9. 更新 progress.md 完成日志
+This section must separate:
 
-## 报告生成规则
+- **intentionally retained manual coverage**
+- **partially automated coverage**
+- **still-missing coverage**
 
-- 不要把报告退化成“数量统计”或“文件清单”
-- 报告必须解释“为什么某些测试仍保留人工执行”
-- 如果关键测试资产没有进入自动化，也必须在报告里明确说明是否已经被人工用例保留
-- 如果某个维度只覆盖了行为、没有覆盖证据，应标记为 partial，而不是直接写 covered
-- 对缺口的描述要具体到维度或资产类型，而不是笼统写“待补充”
+Do not merge these into one bucket.
+
+### 5. Gap Analysis
+
+Classify gaps into:
+
+- `covered`
+- `preserved_manual`
+- `partial`
+- `missing`
+
+Use concrete asset or dimension names. Never write vague "needs more coverage".
+
+## Output Template Reference
+
+See `@report-template.md`.
+
+## Output Location
+
+Write to:
+
+- `.supertester/reports/YYYY-MM-DD-<module>.md`
+
+If multiple modules are involved, you may generate:
+
+- one summary report: `YYYY-MM-DD-summary.md`
+- one detailed report per module
+
+## Steps
+
+1. read all phase output files
+2. aggregate counts and mappings
+3. analyze coverage dimensions
+4. analyze preserved assets and retained manual/partial assets
+5. construct the traceability matrix
+6. write gap analysis using concrete asset/dimension terms
+7. generate the report from the template
+8. update Phase 6 to `complete`
+9. update `progress.md`
+
+## Reporting Rules
+
+- do not reduce the report to counts or file listings
+- explain why some coverage is intentionally manual or partial
+- if an asset is not automated but is preserved manually, say so explicitly
+- if an asset is neither automated nor manually preserved, mark it as missing
+- if a dimension covers only final behavior but not the relevant process, contract, or evidence depth, mark it as partial
+- write in reusable, domain-agnostic language; the structure must work across future products

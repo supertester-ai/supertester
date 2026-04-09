@@ -5,16 +5,16 @@
 - **Requirement Doc:** [filename]
 - **Total Test Cases:** N
 - **Automation Rate:** X%
-- **Review Status:** All phases reviewed
-- **Coverage Summary:** [一句话总结行为覆盖与证据覆盖情况]
+- **Review Status:** [summary]
+- **Coverage Summary:** [one-sentence summary of behavior and evidence coverage]
 
 ## Requirement Coverage
 
-| Req ID | Name | Test Cases | Coverage |
-|--------|------|-----------|----------|
-| F-001 | [name] | TC-001, TC-002 | Full |
-| F-002 | [name] | TC-010 | Full |
-| IR-001 | [name] | TC-005 | Full |
+| Req ID | Name | Test Cases | Automation | Coverage |
+|--------|------|-----------|------------|----------|
+| F-001 | [name] | TC-001, TC-002 | automatable | Full |
+| IR-001 | [name] | TC-005 | partial | Partial |
+| CMS-001 | [name] | TC-020 | manual | Full |
 
 ### Coverage Statistics
 - Total Requirements: N
@@ -28,25 +28,29 @@
 |-----------|--------|----------|-------|
 | Behavior | [covered/partial/missing] | [source] | [notes] |
 | Rules / Enumerations | [covered/partial/missing] | [source] | [notes] |
-| Content | [covered/partial/missing] | [source] | [notes] |
+| Content Fidelity | [covered/partial/missing] | [source] | [notes] |
+| Process Feedback | [covered/partial/missing] | [source] | [notes] |
+| Interruption / Recovery | [covered/partial/missing] | [source] | [notes] |
+| History / List Interaction | [covered/partial/missing] | [source] | [notes] |
 | State / Data | [covered/partial/missing] | [source] | [notes] |
 | Integration | [covered/partial/missing] | [source] | [notes] |
 | Evidence Chain | [covered/partial/missing] | [source] | [notes] |
+| Contract Content | [covered/partial/missing] | [source] | [notes] |
+| Visual / Media Handling | [covered/partial/missing] | [source] | [notes] |
 
-## Critical Test Assets
+## High-Value Asset Preservation
 
 | Asset Type | Description | Coverage | Handling |
 |------------|-------------|----------|----------|
-| [Rules / Content / State / Contract / Integration] | [asset] | [covered/partial/missing] | [automated/manual/preserved] |
+| [content / rules / process / interruption / history / contract / visual / PRD-external] | [asset] | [covered/partial/missing] | [automated/manual/partial/preserved] |
 
 ## Functional Test Cases Summary
 
 ### Module: [Module Name]
 
-| TC ID | Name | Generator | Priority |
-|-------|------|-----------|----------|
-| TC-001 | [name] | Equivalence Class | High |
-| TC-002 | [name] | Boundary Value | High |
+| TC ID | Name | Generator | Fidelity Modes | Priority |
+|-------|------|-----------|----------------|----------|
+| TC-001 | [name] | Equivalence | content_fidelity_mode | High |
 
 **Total by module:** N test cases
 
@@ -58,41 +62,46 @@
 | partial | N | X% |
 | manual | N | X% |
 
-### Manual Retention Notes
-- [为什么某些测试资产保留为人工或半自动]
-
 ## Cross-Module Scenarios
 
 | ID | Name | Type | Modules | Status |
 |----|------|------|---------|--------|
-| CMS-001 | [name] | critical_path | [modules] | Covered |
+| CMS-001 | [name] | interruption_recovery | [modules] | Covered |
 
 ## Automation Scripts
 
 | Script File | Module | Test Cases | Count |
 |-------------|--------|-----------|-------|
-| auth.e2e.spec.ts | Authentication | TC-001, TC-002, TC-003 | 3 |
+| auth.e2e.spec.ts | Authentication | TC-001, TC-002 | 2 |
 
-## Manual Test Cases
+## Retained Manual / Partial Verification
 
-| TC ID | Name | Reason |
-|-------|------|--------|
-| TC-020 | [name] | [why manual] |
+### Intentionally Retained Manual Coverage
+- [asset or scenario kept manual, and why]
+
+### Partially Automated Coverage
+- [asset or scenario partially automated, and what still needs human verification]
+
+### Still-Missing Coverage
+- [asset or scenario not yet preserved in either automated or manual form]
 
 ## Gap Analysis
 
 ### Covered
-- [已明确覆盖的能力、规则或资产]
+- [capability, rule, or asset with explicit coverage]
 
-### Preserved Manual Coverage
-- [虽未脚本化但已被人工用例明确保留的资产]
+### Preserved Manual
+- [asset preserved via manual verification]
 
-### Missing or Partial
-- [当前仍缺失或仅部分覆盖的维度、规则、资产]
+### Partial
+- [dimension or asset with only partial coverage]
+
+### Missing
+- [dimension or asset not yet covered]
 
 ### Recommended Next Actions
-1. [补强建议]
-2. [补强建议]
+1. [next action]
+2. [next action]
 
 ## Traceability Matrix
 
@@ -109,4 +118,4 @@
 | Phase 5 | YYYY-MM-DD | test-reviewer | passed | 0 CRITICAL | review-scripts-*.md |
 
 ## Notes
-- [Any additional observations or recommendations]
+- [additional observations or recommendations]

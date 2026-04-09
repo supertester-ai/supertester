@@ -1,204 +1,251 @@
 ---
 name: requirement-analysis
-description: Use when analyzing requirement documents - parses requirements, detects ambiguities, and conducts clarification dialogues before any test generation
+description: Use when analyzing requirement documents - parses requirements, detects ambiguities, extracts high-value test assets, and conducts clarification dialogues before any test generation
 ---
 
-# Skill 1: 需求解析与澄清
+# Skill 1: Requirement Analysis And Clarification
 
 ## Iron Law
 
-> **不理解需求，就不准生成任何测试。**
-> 如果你还没有完成需求解析和澄清，你不能调用 test-case-generation skill。
+> If the requirements are not understood, no test cases may be generated.
+> Do not invoke `test-case-generation` until requirement analysis and clarification are complete.
 
 <HARD-GATE>
-在所有模糊项澄清完毕之前，不准进入 requirement-association 阶段。
-这适用于所有需求文档，无论看起来多清晰。
+Do not proceed to `requirement-association` while material ambiguities remain unresolved.
+This applies even when the requirement document appears clear at first glance.
 </HARD-GATE>
 
-## 流程
+## Goal
 
+Turn raw requirement documents into structured, test-ready requirements with:
+
+- explicit functional behavior
+- explicit evidence surfaces
+- explicit high-value test assets
+- explicit ambiguity records
+- explicit markers for fidelity-sensitive requirements
+
+The output of this phase must be rich enough that later phases do not need to "guess the missing details back".
+
+## Workflow
+
+```text
+Requirement document
+    |
+    v
+Parse Markdown -> extract modules / features / acceptance criteria / boundaries / dependencies / test assets
+    |
+    v
+Tag each feature with fidelity-sensitive requirement markers
+    |
+    v
+Detect ambiguity -> [Any unresolved ambiguity?]
+    |                      |
+    | no                   | yes
+    v                      v
+Write parsed-             Ask clarification questions one at a time
+requirements.md           and save state to clarifications.json
+    |                      |
+    +----------+-----------+
+               |
+               v
+Update test_plan.md / findings.md / progress.md
 ```
-需求文档
-    |
-    v
-解析 Markdown -> 提取模块/功能/验收标准/边界条件/测试资产
-    |
-    v
-检测模糊项 -> [有模糊项?]
-    |                |
-    | 无             | 有
-    v                v
-写入 parsed-      发起澄清对话（一次一问，多选优先）
-requirements.md       |
-    |                v 每次交互后自动保存状态到 clarifications.json
-    |                |
-    |           [支持暂停/恢复]
-    |                |
-    |                v 所有项澄清完毕
-    |                |
-    +----------------+
-    |
-    v
-更新 test_plan.md Phase 1 -> complete
-更新 findings.md 需求发现
-更新 progress.md 操作日志
-```
 
-## 步骤详解
+## Required Feature Tags
 
-### Step 1: 解析需求文档
+Every `F-xxx` must be evaluated for the following tags. These tags drive later generation strategy and review expectations.
 
-读取用户指定的需求文档（Markdown 格式），提取：
-- **模块**: 顶级功能模块
-- **功能 (F-xxx)**: 每个模块下的具体功能
-- **验收标准**: 每个功能的预期行为
-- **边界条件**: 输入限制、数值范围
-- **依赖**: 该功能依赖的其他模块/服务
-- **测试资产**: 后续生成高价值用例所需的业务证据
-- **来源**: 原始文档文件名 + 行号
+| Tag | Meaning | Typical signals |
+|-----|---------|-----------------|
+| `content_fidelity` | The content itself must be checked precisely | copy, tooltip, email body, empty state, loading text, template content |
+| `process_feedback` | Intermediate states matter, not only the final outcome | loading, progress, scanning, analyzing, processing |
+| `interruption_recovery` | User interruption or context switching matters | refresh, switch language, navigate away, retry, logout during processing |
+| `visual_asset` | Visual/media/brand assets require explicit handling | image, logo, banner, layout, icon, style |
+| `contract_content` | Template/schema/prompt/path content is itself a contract | prompt, schema, JSON structure, output format, log path, export path |
+| `business_outside_prd` | Important rules may live outside the PRD | feature flag, ops config, historical behavior, compatibility, legacy flow |
 
-除了常规功能解析，必须同步抽取“测试资产”。不要等到 test-case-generation 阶段再“顺便想起”，因为那时信息已经丢失。
+If a feature matches one of these tags, record it explicitly. Never rely on later phases to infer it again.
 
-测试资产不是某个行业专属概念，而是任何后续测试设计中“不能只靠功能名概括”的内容。常见类型包括，但不限于：
+## Step 1: Parse The Requirement Document
 
-1. **界面与内容资产**
-   - 页面标题、按钮文案、placeholder、通知、弹窗标题、副标题、空状态、错误提示、邮件内容、导出文件内容
-   - 如果内容本身需要被验证，就要记录，不得只写“文案正确”
+Read the user-provided requirement document and extract:
 
-2. **规则与枚举资产**
-   - 角色矩阵、状态机、错误码列表、名单、配置项、映射表、阈值、优先级、完整列表
-   - 任何“完整列表本身就是需求”的内容，都必须保留原始枚举，而不是只总结为“若干示例”
+- **Modules**: top-level product areas
+- **Features (`F-xxx`)**: concrete behaviors within each module
+- **Acceptance criteria**: expected outcomes and success rules
+- **Boundary conditions**: limits, ranges, thresholds, counts, length rules
+- **Dependencies**: modules, services, environments, third-party systems
+- **Test assets**: anything too important to reduce to a generic "works correctly"
+- **Source**: original file and line numbers
 
-3. **集成与交互资产**
-   - 外部系统、内部服务、接口契约、回调、文件交换、浏览器/设备能力依赖、定时任务、消息队列
-   - 记录触发条件、交互方向、成功反馈、失败反馈、观测方式
+### Required Test Asset Categories
 
-4. **状态与数据资产**
-   - 数据对象、字段、副作用、额度变化、状态变化、缓存、日志、埋点、消息、文件产物
-   - 任何“功能完成后系统内部必须发生什么变化”的内容都要记录
+At minimum, extract these asset types when present:
 
-5. **约束与合约资产**
-   - 输入约束、输出格式、结构化 schema、权限边界、审计规则、生成规则、策略配置
-   - 只要系统存在“必须遵守的规则”，就要把规则本身当成可测试资产，而不是只测试表层流程
+1. **Content assets**
+   - titles, button text, placeholders, notifications, modal copy, email content, loading text, empty states, help text
+2. **Rule and enumeration assets**
+   - matrices, allowlists, denylists, roles, statuses, error code lists, configuration options, exact supported values
+3. **Integration assets**
+   - callbacks, external systems, retries, sync points, async feedback, import/export contracts
+4. **State and data assets**
+   - field updates, quota changes, persistence, logs, records, derived state, history entries
+5. **Constraint and contract assets**
+   - schemas, prompt templates, output structures, file naming rules, path formats, permission rules
+6. **Evidence surfaces**
+   - UI, API, DB, Event, File, Message, Log, Metrics, External System
 
-6. **证据类型资产**
-   - 对每个功能标记验证证据来自哪里：UI / API / DB / Event / File / Message / Log / Metrics / External System
-   - 一个功能可以对应多种证据类型，后续用例必须据此覆盖，不得只保留单一观测面
+## Step 1.5: Build The Dual View For Every Feature
 
-### Step 1.5: 建立“功能层”与“证据层”的双视图
+Every `F-xxx` must answer both questions:
 
-每个 F-xxx 都必须同时回答两个问题：
-- **功能层**: 用户做了什么，系统应该表现出什么行为？
-- **证据层**: 我们通过什么证据证明它真的做对了？
+- **Behavior view**: what does the user or system do?
+- **Evidence view**: how do we prove it happened correctly?
 
-如果只写出功能层，没有写出证据层，后续很容易出现“行为看起来被覆盖了，但验证深度不足”的问题，例如：
-- 只测页面是否跳转，不测状态是否真的更新
-- 只测主流程是否成功，不测失败和回滚
-- 只测操作入口，不测输出内容或副作用
-- 只测代表值，不保留完整规则列表或矩阵
+If only the behavior view is captured, later phases will overfit to happy-path interactions and underfit to verification depth.
 
-在 parsed-requirements.md 中，至少为每个功能记录：
-- 主要证据类型
-- 关键业务资产
-- 不可丢失的规则、列表、内容或数据断言
+### Additional P0 Extraction Rules
 
-### Step 2: 检测模糊项
+For each feature, explicitly record:
 
-使用 @clarification-patterns.md 中的模式检测模糊需求。常见模糊信号：
-- 使用"等"、"之类"、"相关"等模糊词
-- 缺少具体数值（"合理的时间"、"适当的长度"）
-- 缺少错误处理描述
-- 多种理解方式
-- 隐含的前置/后置条件
+- primary evidence surfaces
+- irreplaceable assets that must not be abstracted away
+- required feature tags from the tag table above
 
-除了功能语义模糊，还必须检测“测试资产模糊”。下面几类都要主动澄清：
-- 内容是否要求逐字匹配，还是只校验语义一致
-- 列表/矩阵是否要保留完整枚举，还是只测代表值
-- 是否需要系统内部状态、日志、消息、文件或指标级断言
-- 是否存在必须遵守的输入/输出/权限/格式/策略规则
-- 外部或上下游交互是否存在固定回调、错误码、测试条件或环境依赖
+## Step 2: Detect Ambiguity
 
-如果需求里出现以下信号，默认判为必须澄清：
-- “提示如下”“文案如下”“内容如下”
-- “支持以下几种”“名单如下”“例如”
-- “写入库表”“更新状态”“扣减额度”“记录日志”
-- “规则如下”“格式如下”“输出如下”“策略如下”
-- “回调”“异步通知”“同步”“重试”“对账”“导入”“导出”
+Use `@clarification-patterns.md` to detect ambiguous requirements.
 
-### Step 3: 澄清对话
+Common semantic ambiguity signals:
 
-规则：
-- **一次一问** — 不要一次抛出多个问题
-- **多选优先** — 尽可能提供选项让用户选择
-- **每次交互后保存** — 更新 clarifications.json
-- **支持暂停** — 用户可以说"暂停"，下次说"继续澄清"时恢复
+- vague words such as "etc", "related", "reasonable", "appropriate"
+- missing numeric thresholds
+- missing error behavior
+- multiple plausible interpretations
+- hidden preconditions or postconditions
 
-### Step 4: 写入产出文件
+### Also Detect Test-Asset Ambiguity
 
-完成解析和澄清后：
-1. 写入 `.supertester/requirements/parsed-requirements.md`
-2. 写入 `.supertester/requirements/clarifications.json`（如有澄清）
-3. 更新 `.supertester/test_plan.md` Phase 1 Status -> complete
-4. 更新 `.supertester/findings.md` 需求发现
-5. 更新 `.supertester/progress.md` 操作日志
+You must also clarify ambiguity in test assets, not only feature semantics.
 
-## 2-Action Rule 落地
+Clarify when any of the following is unclear:
 
-- 解析了 2 个模块 -> 立即写入 parsed-requirements.md
-- 完成了 2 轮澄清 -> 立即更新 clarifications.json
+- whether copy must match exactly or only semantically
+- whether a list/matrix must be fully enumerated or only sampled
+- whether intermediate progress states must be verified
+- whether visual assets must be manually checked
+- whether prompt/schema/template content is contractual
+- whether history tables need sorting/pagination/scroll behavior validation
+- whether there are PRD-external rules such as ops flags, legacy behavior, removed features, or compatibility constraints
 
-## 输出格式
+### Strong Clarification Triggers
+
+Treat the following phrases as default clarification triggers when the requirement does not fully specify expectations:
+
+- "content as follows"
+- "copy as follows"
+- "template as follows"
+- "prompt as follows"
+- "schema as follows"
+- "image as follows"
+- "history list"
+- "pagination"
+- "sorting"
+- "loading"
+- "processing"
+- "refresh"
+- "switch language"
+- "log path"
+- "export path"
+- "legacy"
+- "feature flag"
+
+## Step 3: Clarification Dialogue
+
+Rules:
+
+- ask one question at a time
+- prefer multiple-choice when possible
+- save `clarifications.json` after each answer
+- support pause and resume
+
+### Mandatory P0 Clarification Branch
+
+Ask explicitly when not already answered by the source materials:
+
+> Are there any important rules outside the PRD, such as ops toggles, historical compatibility behavior, removed-but-still-regression-worthy flows, or admin configuration that changes user behavior?
+
+If yes, record them as test assets and tag the affected features with `business_outside_prd`.
+
+## Step 4: Write Output Files
+
+After analysis and clarification:
+
+1. write `.supertester/requirements/parsed-requirements.md`
+2. write `.supertester/requirements/clarifications.json` if clarifications exist
+3. update `.supertester/test_plan.md` Phase 1 status to `complete`
+4. update `.supertester/findings.md`
+5. update `.supertester/progress.md`
+
+## 2-Action Rule
+
+- after analyzing 2 modules, update `parsed-requirements.md`
+- after 2 clarification rounds, update `clarifications.json`
+
+## Output Format
 
 ### parsed-requirements.md
 
 ```markdown
-# 需求解析结果
+# Requirement Analysis
 
-## 来源文档
-- <filename> (解析时间: YYYY-MM-DDTHH:MM:SSZ)
+## Source Documents
+- <filename> (analyzed at: YYYY-MM-DDTHH:MM:SSZ)
 
-## 模块清单
+## Module List
 
-### 模块: [模块名]
+### Module: [Module Name]
 
-#### F-001: [功能名]
-- **描述:** [功能描述]
-- **验收标准:**
-  - [标准1]
-  - [标准2]
-- **边界条件:** [边界1], [边界2]
-- **依赖:** [依赖列表]
-- **证据类型:** UI | API | DB | Event | File | Message | Log | Metrics | External System
-- **关键测试资产:**
-  - **内容资产:** [需要明确验证的内容清单]
-  - **规则/枚举:** [完整列表或矩阵说明]
-  - **集成资产:** [外部系统/回调/依赖]
-  - **状态/数据断言:** [对象/字段/状态/日志/消息]
-  - **约束/合约:** [输入/输出/格式/权限/策略]
-- **来源:** `<filename>` 行 XX-XX
+#### F-001: [Feature Name]
+- **Description:** [feature description]
+- **Acceptance Criteria:**
+  - [criterion 1]
+  - [criterion 2]
+- **Boundary Conditions:** [boundary 1], [boundary 2]
+- **Dependencies:** [dependency list]
+- **Evidence Surfaces:** UI | API | DB | Event | File | Message | Log | Metrics | External System
+- **Feature Tags:** content_fidelity | process_feedback | interruption_recovery | visual_asset | contract_content | business_outside_prd
+- **High-Value Test Assets:**
+  - **Content Assets:** [copy / text / templates that matter]
+  - **Rule / Enum Assets:** [full list or matrix]
+  - **Integration Assets:** [callbacks / systems / external dependencies]
+  - **State / Data Assertions:** [objects / fields / persistence / history / logs]
+  - **Constraint / Contract Assets:** [schema / prompt / path / output contract]
+- **Source:** `<filename>` lines XX-YY
 
-## 测试资产汇总
+## Asset Inventory
 
 ### Content Inventory
-- [资产名] -> [对应功能] -> [语言要求] -> [来源]
+- [asset] -> [feature] -> [exact vs semantic] -> [source]
 
-### Enum / Matrix Inventory
-- [资产名] -> [完整列表或矩阵说明] -> [对应功能] -> [来源]
+### Rule / Matrix Inventory
+- [asset] -> [full list or matrix] -> [feature] -> [source]
 
-### Integration Inventory
-- [系统名] -> [触发功能] -> [成功/失败回调] -> [来源]
+### Process Feedback Inventory
+- [asset] -> [feature] -> [intermediate states to verify] -> [source]
 
-### State / Data Assertion Inventory
-- [对象/字段/状态] -> [触发功能] -> [预期变化] -> [来源]
+### Interruption / Recovery Inventory
+- [asset] -> [feature] -> [refresh / retry / context switch expectation] -> [source]
 
-### Constraint / Contract Inventory
-- [规则/契约名] -> [对应功能] -> [校验要求] -> [来源]
+### Visual Asset Inventory
+- [asset] -> [feature] -> [manual or partial verification expectation] -> [source]
 
-## 统计
-- 总模块: N
-- 总功能: N
-- 总验收标准: N
-- 模糊项: N (已全部澄清)
+### Contract Content Inventory
+- [asset] -> [feature] -> [schema / prompt / path / template rule] -> [source]
+
+### PRD-External Business Inventory
+- [asset] -> [feature] -> [ops / legacy / config / compatibility note] -> [source]
 ```
 
 ### clarifications.json
@@ -214,8 +261,8 @@ requirements.md       |
     {
       "id": "CL-001",
       "relatedFeature": "F-001",
-      "question": "问题描述",
-      "answer": "用户回答",
+      "question": "Question text",
+      "answer": "User answer",
       "answeredAt": "ISO-8601"
     }
   ],
@@ -223,47 +270,48 @@ requirements.md       |
     {
       "id": "CL-002",
       "relatedFeature": "F-001",
-      "question": "问题描述",
+      "question": "Question text",
       "status": "pending",
-      "options": ["选项A", "选项B", "选项C"]
+      "options": ["Option A", "Option B", "Option C"]
+    }
+  ],
+  "prdExternalAssets": [
+    {
+      "id": "EXT-001",
+      "relatedFeature": "F-001",
+      "type": "ops_toggle|legacy_behavior|admin_config|removed_flow|compatibility_rule",
+      "description": "Description of the rule outside the PRD"
     }
   ],
   "pauseReason": ""
 }
 ```
 
-## 恢复机制
+## Resume Behavior
 
-| 触发方式 | 行为 |
-|---------|------|
-| 用户说"继续澄清" | 读取最近的 clarifications.json，从 pendingClarifications 继续 |
-| 用户说"恢复 CL-002" | 恢复指定澄清项 |
-| 新会话启动 | SessionStart hook 检测到 clarifications.json 且 status != completed，提示用户 |
+| Trigger | Behavior |
+|---------|----------|
+| user says "continue clarification" | read the latest `clarifications.json` and resume pending items |
+| user says "resume CL-002" | resume the specified clarification |
+| new session starts | if `clarifications.json` exists and is not completed, prompt the user to continue |
 
 ## Red Flags
 
-| 如果你在想... | 现实是... |
-|--------------|------------|
-| "需求看起来很清楚" | 每个需求都有隐藏的模糊项，做完检测才知道 |
-| "跳过澄清直接生成" | 违反 Iron Law，模糊需求生成的用例是浪费 |
-| "用户催得急，先生成再说" | 返工成本远高于澄清成本 |
-| "这个模糊项不影响测试" | 你不是产品经理，让用户决定 |
-| "只有一两个模糊项，不需要走流程" | 一个模糊项可以衍生出多个错误用例 |
-| "这些只是细节，不算需求" | 在测试设计里，它们是高价值测试资产，遗漏后会直接造成覆盖失真 |
-| "后面生成用例时再补这些细节" | 后置补全会丢上下文，最容易漏掉枚举、集成和数据副作用 |
+| If you think... | Reality is... |
+|-----------------|---------------|
+| "These details are too minor to capture" | Those details often become the highest-value missing tests. |
+| "We can add the copy checks later" | Later phases usually abstract them away. |
+| "Prompt/template text is implementation detail" | In AI systems, it is often business logic. |
+| "Visual assets are not automatable, so ignore them" | They still must be preserved as manual or partial verification assets. |
+| "PRD should be enough" | Real systems often depend on ops and historical behavior not stated in the PRD. |
 
-## 模糊项过多处理
+## Completion Criteria
 
-如果检测到超过 10 个模糊项：
-- 按模块分组
-- 分批澄清，每批不超过 3 个问题
-- 在 clarifications.json 中记录进度
+Phase 1 is complete only when:
 
-## 本阶段完成标准
-
-只有同时满足下面条件，Phase 1 才算完成：
-- 所有 F-xxx 都已解析为结构化功能项
-- 关键模糊项已澄清
-- 高价值测试资产已抽取，不仅仅是功能描述
-- 已标记主要证据类型
-- 已保留完整规则、列表、内容或数据断言，不以“示例”替代完整需求
+- every `F-xxx` is structured
+- material ambiguities are clarified
+- high-value assets are extracted
+- required feature tags are assigned
+- primary evidence surfaces are recorded
+- PRD-external business assets have been asked about or explicitly ruled out

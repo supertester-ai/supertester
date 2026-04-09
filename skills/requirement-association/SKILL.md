@@ -1,199 +1,256 @@
 ---
 name: requirement-association
-description: Use when analyzing module dependencies and cross-module scenarios - discovers implicit requirements, generates cross-module test scenarios, requires user confirmation before proceeding
+description: Use when analyzing module dependencies and cross-module scenarios - discovers implicit requirements, generates cross-module scenarios, and surfaces interruption, recovery, evidence-chain, and shared-resource risks before test case generation
 ---
 
-# Skill 2: 需求关联分析
+# Skill 2: Requirement Association Analysis
 
 ## Iron Law
 
-> **不分析关联，就不准生成用例。**
-> 单模块测试无法覆盖模块间的交互问题。必须先完成关联分析。
+> If associations are not analyzed, test cases must not be generated.
+> Single-module reasoning cannot reliably cover boundary failures between modules, states, evidence surfaces, and shared resources.
 
 <HARD-GATE>
-在用户确认关联分析结果之前，不准进入 test-case-generation 阶段。
+Do not proceed to `test-case-generation` until the user confirms the association analysis results.
 </HARD-GATE>
 
-## 前置条件
+## Preconditions
 
-- Phase 1 (requirement-analysis) Status: **complete**
-- `.supertester/requirements/parsed-requirements.md` 已生成
+- Phase 1 status is `complete`
+- `.supertester/requirements/parsed-requirements.md` exists
 
-## 流程
+## Goal
 
-```
+Build a dependency and scenario view that explains not only what connects to what, but also:
+
+- which state transitions cross boundaries
+- which evidence surfaces depend on other modules
+- which shared resources create coupling risk
+- which interruption and recovery flows matter
+- which list/history mechanics depend on cross-feature state
+
+## Workflow
+
+```text
 parsed-requirements.md
     |
     v
-关联分析 -> module-dependencies.md
-    |  (功能依赖 + 状态依赖 + 证据依赖 + 共享资源依赖)
+Dependency analysis -> module-dependencies.md
     |
     v
-隐含需求挖掘 -> implicit-requirements.md
-    |  (前置条件隐含 + 后置结果隐含 + 数据一致性隐含
-    |   + 边界情况隐含 + 异常传导隐含)
+Implicit requirement mining -> implicit-requirements.md
     |
     v
-跨模块场景生成 -> cross-module-scenarios.md
-    |  (关键路径 + 模块边界 + 错误传导 + 并发 + 数据同步)
+Cross-module scenario generation -> cross-module-scenarios.md
     |
     v
--> test-reviewer agent 审查 -> reviews/review-association-*.md
+test-reviewer audit -> reviews/review-association-*.md
     |
     v
--> 用户确认
+User confirmation
     |
     v
-更新 test_plan.md Phase 2 -> complete
+Update test_plan.md Phase 2 -> complete
 ```
 
-## 步骤详解
+## Step 1: Dependency Analysis
 
-### Step 1: 关联分析
+Read `parsed-requirements.md` and analyze:
 
-读取 parsed-requirements.md，分析：
+1. **Functional dependencies**
+   - one feature explicitly depends on another feature or module
+2. **State dependencies**
+   - one feature consumes or relies on state created by another
+3. **Evidence dependencies**
+   - verification requires evidence emitted from a different module or system
+4. **Shared-resource dependencies**
+   - multiple features share data, configuration, cache, jobs, queues, files, records, or quotas
 
-1. **功能依赖** — 需求文档中明确提到的模块/功能间依赖
-2. **状态依赖** — 一个功能的结果、状态或产物是否成为另一个功能的前提
-3. **证据依赖** — 一个功能是否需要通过另一个模块或系统提供的证据来验证
-4. **共享资源依赖** — 共享对象、配置、缓存、消息、文件或其他公共资源的功能
+### New P1 Association Checks
 
-这里的目标不是只回答“模块 A 依赖模块 B”，而是回答：
-- 哪些能力必须串起来才能形成真实用户路径
-- 哪些状态或数据会跨边界流动
-- 哪些验证证据来自别的模块、系统或观测面
-- 哪些共享资源可能导致冲突、串扰或一致性问题
+Also analyze two additional dependency families for every feature set:
 
-输出到 `.supertester/requirements/module-dependencies.md`:
+5. **Interruption and recovery dependencies**
+   - refresh, retry, navigation away, session expiry, language/context switch, page rebuild, resume-after-failure
+6. **History and list interaction dependencies**
+   - list ordering, pagination, lazy loading, empty state, feed refresh, history accumulation, cross-feature record visibility
+
+The purpose is not only to say "A depends on B", but to explain:
+
+- which flows must be chained to form real user journeys
+- which states or records move across boundaries
+- which evidence surfaces originate from another module
+- which interruptions can invalidate or rebuild in-progress state
+- which history/list outputs depend on earlier feature execution
+
+### Output: `module-dependencies.md`
 
 ```markdown
-# 关联分析
+# Dependency Analysis
 
-## 依赖图
+## Dependency Map
+| Module / Feature | Type | Depends On | Dependency Types |
+|------------------|------|------------|------------------|
+| [Module or Feature] | core/support | [dependency list] | functional/state/evidence/shared_resource/interruption_recovery/history_interaction |
 
-| 模块/功能 | 类型 | 依赖对象 | 依赖类型 |
-|------|------|------|---------|
-| [模块名或功能名] | core/support | [依赖对象列表] | functional/state/evidence/shared_resource |
+## Critical Paths
+1. [Module A] -> [Module B] -> [Module C]
 
-## 关键路径
-1. [模块A] -> [模块B] -> [模块C] -> [模块D]
-2. ...
+## Shared Resources
+| Resource | Shared By | Risk |
+|----------|-----------|------|
+| [resource] | [modules] | high/medium/low |
 
-## 共享资源
-| 资源 | 共享模块 | 冲突风险 |
-|------|---------|---------|
-| [资源名] | [模块列表] | high/medium/low |
+## Evidence Dependencies
+| Feature | Evidence Surface | Evidence Source | Risk |
+|---------|------------------|-----------------|------|
+| [feature] | UI/API/DB/Event/File/Message/Log/Metrics/External System | [source] | high/medium/low |
 
-## 证据依赖
-| 功能 | 证据类型 | 证据来源 | 风险 |
-|------|---------|---------|------|
-| [功能名] | UI/API/DB/Event/File/Message/Log/Metrics/External System | [来源对象] | high/medium/low |
+## Interruption / Recovery Dependencies
+| Feature | Interruption Trigger | Recovery Expectation | Risk |
+|---------|----------------------|----------------------|------|
+| [feature] | refresh / retry / context switch / re-auth | reset / resume / preserve / replay / degrade | high/medium/low |
+
+## History / List Dependencies
+| Feature | Downstream List / History Surface | Dependency | Risk |
+|---------|-----------------------------------|------------|------|
+| [feature] | [history or list surface] | visibility / ordering / pagination / accumulation | high/medium/low |
 ```
 
-### Step 2: 隐含需求挖掘
+## Step 2: Mine Implicit Requirements
 
-从需求文本中挖掘未明确写出但逻辑上必须存在的需求：
+Infer requirements that are not explicitly written but are logically necessary.
 
-1. **前置条件隐含** — "登录后显示仪表板" -> 未登录访问 /dashboard 应重定向
-2. **后置结果隐含** — "操作成功" -> 相关对象、状态或产物应同步更新
-3. **数据一致性隐含** — 修改用户名 -> 所有显示用户名的地方都应更新
-4. **边界情况隐含** — "支持多个地址" -> 最大地址数？删除最后一个地址？
-5. **异常传导隐含** — 上游失败、超时、重试、回滚、延迟同步将如何影响下游？
-6. **证据完整性隐含** — 需求写了行为，但没有写如何观察、如何证明成功或失败
-7. **共享资源隐含** — 多个功能共用同一对象或配置时，是否存在覆盖、串扰、竞争条件
+Categories:
 
-输出到 `.supertester/requirements/implicit-requirements.md`:
+1. **Precondition implications**
+2. **Postcondition implications**
+3. **Data consistency implications**
+4. **Boundary-case implications**
+5. **Error propagation implications**
+6. **Evidence completeness implications**
+7. **Shared-resource implications**
+8. **Interruption / recovery implications**
+9. **History / list consistency implications**
+
+### Generic P1 Implication Patterns
+
+Look for these domain-agnostic patterns:
+
+- if a process can run long enough to show progress, what happens on refresh?
+- if a user can switch context, does the in-progress state reset, persist, or resume?
+- if records are created, do they appear in history/list surfaces with the right order and visibility?
+- if a feature writes state asynchronously, when is that state visible downstream?
+- if pagination or lazy loading exists, is ordering stable across pages or fetches?
+- if retries occur, does history duplicate, merge, or replace prior attempts?
+
+### Output: `implicit-requirements.md`
 
 ```markdown
-# 隐含需求
+# Implicit Requirements
 
-| ID | 推断来源 | 隐含需求 | 类型 | 严重性 |
-|----|---------|---------|------|--------|
-| IR-001 | F-001: "登录后显示仪表板" | 未登录访问 /dashboard 应重定向到登录页 | security | high |
-| IR-002 | F-005: "操作成功" | 失败或中断时系统状态应保持一致或回滚 | error_handling | critical |
+| ID | Inferred From | Implicit Requirement | Type | Severity |
+|----|---------------|----------------------|------|----------|
+| IR-001 | F-001: "processing starts" | Refresh during processing must either preserve progress, resume safely, or clearly reset state. | interruption_recovery | high |
+| IR-002 | F-005: "history list shows results" | Newly generated results must appear in the correct list position with stable ordering rules. | history_interaction | high |
 ```
 
-### Step 3: 跨模块场景生成
+## Step 3: Generate Cross-Module Scenarios
 
-基于依赖图和隐含需求，生成跨模块测试场景：
+Based on dependencies and implicit requirements, generate cross-module scenarios.
 
-场景类型：
-- **critical_path** — 核心业务流程的端到端路径
-- **module_boundary** — 两个模块交互的边界测试
-- **error_propagation** — 一个模块错误如何影响下游模块
-- **concurrent** — 多模块并发操作的冲突场景
-- **data_sync** — 数据在多模块间的一致性验证
-- **evidence_chain** — 一个行为需要多个观测面共同验证的场景
-- **shared_resource** — 多个功能共享同一资源时的干扰与隔离验证
+### Scenario Types
 
-输出到 `.supertester/requirements/cross-module-scenarios.md`:
+- `critical_path`
+- `module_boundary`
+- `error_propagation`
+- `concurrent`
+- `data_sync`
+- `evidence_chain`
+- `shared_resource`
+- `interruption_recovery`
+- `history_interaction`
+
+### Required P1 Scenario Heuristics
+
+Generate interruption/recovery scenarios when:
+
+- one module starts work and another module or UI state displays progress or results
+- state can survive or be lost across refresh/navigation/session changes
+- recovery behavior is user-visible or business-significant
+
+Generate history/list scenarios when:
+
+- one feature produces records consumed by another feature's list/history/table/feed
+- ordering, pagination, visibility, empty-state, or accumulation semantics exist
+- records can be retried, updated, or replaced asynchronously
+
+### Output: `cross-module-scenarios.md`
 
 ```markdown
-# 跨模块测试场景
+# Cross-Module Test Scenarios
 
-## CMS-001: [场景名称]
+## CMS-001: [Scenario Name]
 
-**场景类型:** critical_path | module_boundary | error_propagation | concurrent | data_sync | evidence_chain | shared_resource
-**涉及模块:** [模块列表]
-**入口条件:** [前置条件]
-**退出条件:** [成功标准]
+- **Type:** critical_path | module_boundary | error_propagation | concurrent | data_sync | evidence_chain | shared_resource | interruption_recovery | history_interaction
+- **Modules:** [module list]
+- **Entry Conditions:** [preconditions]
+- **Exit Conditions:** [success criteria]
 
-| 步骤 | 模块 | 操作 | 预期结果 |
-|------|------|------|---------|
-| 1 | [模块] | [操作] | [结果] |
+| Step | Module | Action | Expected Result |
+|------|--------|--------|-----------------|
+| 1 | [module] | [action] | [result] |
 
-**溯源:** F-001, F-003, IR-001
+- **Source:** F-001, F-003, IR-001
 ```
 
-### Step 4: test-reviewer 审查
+## Step 4: test-reviewer Audit
 
-生成完上述三个文件后，调用 test-reviewer agent 审查：
-- 隐含需求是否合理
-- 跨模块场景是否完整
-- 是否遗漏关键依赖路径
-- 是否遗漏关键证据链
-- 是否遗漏共享资源冲突点
-- 是否把“行为依赖”误当成了全部关联，而忽略状态、数据和观测面的关联
+Call `test-reviewer` to inspect:
 
-审查结果保存到 `.supertester/reviews/review-association-<timestamp>.md`
+- missing critical dependency paths
+- missing evidence dependencies
+- missing shared-resource risks
+- missing interruption/recovery scenarios
+- missing history/list interaction scenarios
+- overfocus on behavior dependencies while ignoring state/evidence/resource dependencies
 
-### Step 5: 用户确认
+Save the result to `.supertester/reviews/review-association-<timestamp>.md`.
 
-向用户展示：
-1. 模块依赖概要
-2. 发现的隐含需求列表
-3. 跨模块测试场景列表
-4. 审查结果摘要
+## Step 5: User Confirmation
 
-等待用户确认后，更新 test_plan.md Phase 2 -> complete。
+Show the user:
 
-## 2-Action Rule 落地
+1. dependency summary
+2. implicit requirements summary
+3. cross-module scenarios summary
+4. reviewer summary
 
-- 分析了 2 个模块的依赖 -> 立即写入 module-dependencies.md
-- 挖掘了 2 个隐含需求 -> 立即写入 implicit-requirements.md
-- 生成了 2 个跨模块场景 -> 立即写入 cross-module-scenarios.md
+After confirmation, mark Phase 2 complete.
 
-每完成 2 项关联分析时，优先补写：
-- 新发现的状态依赖
-- 新发现的证据依赖
-- 新发现的共享资源风险
+## 2-Action Rule
+
+- after analyzing 2 module dependencies, update `module-dependencies.md`
+- after inferring 2 implicit requirements, update `implicit-requirements.md`
+- after generating 2 cross-module scenarios, update `cross-module-scenarios.md`
 
 ## Red Flags
 
-| 如果你在想... | 现实是... |
-|--------------|------------|
-| "单模块够了" | 80% 的生产 bug 发生在模块交互边界 |
-| "不需要跨模块测试" | 用户流程天然跨模块，不测就是盲区 |
-| "关联分析太慢了" | 发现隐含需求比事后修 bug 便宜 100 倍 |
-| "隐含需求太多了" | 按严重性排序，critical 必须覆盖 |
-| "跳过审查直接给用户" | test-reviewer 必须先审查 |
-| "功能链路已经写了，关联分析就够了" | 如果没有状态链、证据链和共享资源分析，后续仍会漏掉高价值测试点 |
+| If you think... | Reality is... |
+|-----------------|---------------|
+| "Single-module test design is enough" | Most production defects hide at boundaries between modules, states, or evidence surfaces. |
+| "Interruption behavior is just UX polish" | Interruption and recovery behavior often changes correctness, data visibility, and trust. |
+| "History lists are downstream UI only" | They are often the visible proof that upstream work completed correctly. |
+| "Only the happy path needs association analysis" | Boundaries fail most often under retries, delays, async updates, and context changes. |
+| "If it is not explicit in the PRD, it is not part of association analysis" | Many cross-module failures are implicit by nature. |
 
-## 本阶段完成标准
+## Completion Criteria
 
-只有同时满足下面条件，Phase 2 才算完成：
-- 已识别主要功能依赖
-- 已识别关键状态/数据依赖
-- 已识别主要证据依赖与观测面
-- 已识别共享资源与潜在冲突点
-- 跨模块场景不只覆盖 happy path，也覆盖错误传导、一致性和证据链
+Phase 2 is complete only when:
+
+- major functional dependencies are identified
+- major state and evidence dependencies are identified
+- shared-resource risks are identified
+- interruption/recovery associations are considered where applicable
+- history/list interactions are considered where applicable
+- cross-module scenarios cover more than happy paths

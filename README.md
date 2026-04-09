@@ -1,47 +1,171 @@
 # Supertester
 
-面向 AI coding agent 的测试工作流插件，从需求分析一路推进到测试用例、自动化可行性判断、Playwright 脚本和最终测试报告。
+面向 AI coding agent 的测试工作流插件。它把需求分析、测试设计、自动化可行性判断、脚本生成和最终报告串成一条可追踪、可恢复、可审查的流程，而不是一次性输出一批测试内容。
 
-当前仓库的实现形态是“插件 + skills + hooks + 模板”，不是传统的 `src/` 应用。README 已按现状重写，适合作为仓库首页和接入说明。
+当前仓库的核心不是传统 `src/` 应用，而是一套由 `skills/`、`hooks/`、`templates/`、`agents/` 和 `.opencode/` 组成的测试能力编排资产。
 
-## 它能做什么
+## 它解决什么问题
 
-Supertester 把测试工作拆成一条可追踪的 6 阶段流程：
+Supertester 适合这类场景：
+
+- 需要从需求文档稳定地产出功能测试用例
+- 希望把测试分析过程沉淀为可追踪文件，而不是只留在会话上下文里
+- 需要区分 `automatable`、`partial`、`manual`，而不是强行把所有场景自动化
+- 希望在生成测试资产前后都加入质量门禁，而不是“生成完就算完成”
+- 需要跨会话恢复测试设计工作，或者让不同 agent 协作完成同一条测试链路
+
+## 核心设计
+
+- 需求优先：不理解需求，不进入后续测试资产生成
+- 文件持久化：关键决策和阶段产物写入 `.supertester/`
+- 分阶段生成：先功能测试设计，再自动化分析，再脚本生成
+- 独立审查：由 `test-reviewer` 负责质量门禁，生成和审查角色分离
+- 保留人工资产：对视觉、媒体、复杂内容、人工判断场景保留 `manual` 或 `partial`
+- 通用化规则：规则面向跨业务复用，不绑定某个具体产品域
+
+## 工作流总览
+
+Supertester 当前采用 6 个主阶段：
 
 1. 需求解析与澄清
-2. 需求关联与跨模块场景分析
+2. 需求关联与跨模块分析
 3. 功能测试用例生成
 4. 自动化可行性分析
 5. Playwright 脚本生成
 6. 测试报告生成
 
-核心特点：
+```mermaid
+flowchart TD
+    A["Phase 1<br/>Requirement Analysis"] --> B["Phase 2<br/>Requirement Association"]
+    B --> C["Phase 3<br/>Test Case Generation"]
+    C --> D["Phase 4<br/>Automation Analysis"]
+    D --> E["Phase 5<br/>Automation Scripting"]
+    E --> F["Phase 6<br/>Test Reporting"]
+    C --> R["test-reviewer"]
+    E --> R
+    R --> C
+    R --> E
+```
 
-- 基于 `skills/` 提供阶段化能力，而不是单次大提示词
-- 基于 `.supertester/` 做文件级持久化，支持中断恢复
-- 基于 `hooks/` 在关键时机注入上下文，减少流程跑偏
-- 引入独立 `test-reviewer` 进行阶段审查
-- 支持把测试资产沉淀为 Markdown 和 Playwright 代码
+## 新版能力重点
 
-## 当前仓库结构
+这次 README 对齐了当前实现里的 P0 / P1 改造。现在 Supertester 不再只追求“行为覆盖”，还会显式保护高价值测试资产，避免在泛化生成时把重要细节抹平。
+
+### P0：高保真测试设计
+
+Phase 1 到 Phase 3 新增了 6 类显式特性标签，用来识别那些不能被“正常流程覆盖”替代的测试资产：
+
+- `content_fidelity`
+- `process_feedback`
+- `interruption_recovery`
+- `visual_asset`
+- `contract_content`
+- `business_outside_prd`
+
+这些标签会影响后续的澄清问题、关联分析、用例生成粒度和 reviewer 的审查重点。
+
+### P1：跨阶段补强
+
+Phase 2 和 Phase 6 进一步补了两类常见但容易漏掉的通用能力：
+
+- `interruption_recovery`
+- `history_interaction`
+
+它们不是针对某个具体业务写的，而是针对一类常见产品行为模式：处理中可中断、结果沉淀到列表/记录、列表存在分页排序滚动与可见性要求。
+
+## 高保真资产如何流转
+
+```mermaid
+flowchart LR
+    A["Requirement Text"] --> B["Phase 1<br/>Extract traits and tags"]
+    B --> C["Tags<br/>content_fidelity<br/>process_feedback<br/>interruption_recovery<br/>visual_asset<br/>contract_content<br/>business_outside_prd"]
+    C --> D["Phase 2<br/>Association and implicit dependencies"]
+    D --> E["Phase 3<br/>Fidelity strategy selection"]
+    E --> F["Generated Cases"]
+    F --> G["test-reviewer<br/>High-Fidelity Coverage Radar"]
+    G --> H["Confirmed Functional Cases"]
+```
+
+## 用例生成的关键变化
+
+新版 `test-case-generation` 不再只根据需求类型选生成器，还会先决定保真度策略。当前支持的策略模式包括：
+
+- `enumeration_mode`
+- `content_fidelity_mode`
+- `process_mode`
+- `interruption_mode`
+- `visual_fallback_mode`
+- `history_interaction_mode`
+- `contract_content_mode`
+
+这套模式解决的是“测什么”和“测到多细”之间的断层问题：
+
+- 列表、本体枚举、矩阵规则不再被随意抽样
+- loading、processing、staged feedback 不再只测最终态
+- 刷新、中断、重试、切换上下文后的恢复行为会被显式建模
+- 图片、Logo、媒体和布局类需求不会因为自动化困难而被静默丢弃
+- prompt、schema、模板字段、输出路径等内容合约会被当作契约来测
+
+## 审查机制
+
+`agents/test-reviewer.md` 现在不仅看结构正确性，还会执行一层 “High-Fidelity Coverage Radar” 审查，重点检查：
+
+- 内容保真是否被抽象掉
+- 过程态是否只剩最终态验证
+- 中断与恢复是否漏测
+- 历史/列表交互是否漏掉分页、排序、滚动、空态
+- 视觉/媒体资产是否被保留为 `manual` 或 `partial`
+- prompt / schema / path / template 是否按合约验证
+- PRD 外业务资产是否进入覆盖范围
+
+其中一部分缺口会被直接提升为 `HIGH`，不能带着进入下一阶段。
+
+## 自动化边界说明
+
+Supertester 不要求所有测试都自动化。它会在 Phase 4 和 Phase 6 中明确区分：
+
+- `automatable`
+- `partial`
+- `manual`
+- `missing`
+
+这让最终报告不只回答“写了多少用例”，还会回答“哪些资产能自动化、哪些必须保留人工判断、哪些仍存在缺口”。
+
+```mermaid
+flowchart TD
+    A["Functional Cases"] --> B["Automation Analysis"]
+    B --> C["Automatable"]
+    B --> D["Partial"]
+    B --> E["Manual"]
+    C --> F["Playwright Scripts"]
+    D --> G["Script + Human Verification Notes"]
+    E --> H["Manual Verification Assets"]
+    F --> I["Final Test Report"]
+    G --> I
+    H --> I
+    B --> J["Missing or blocked coverage"]
+    J --> I
+```
+
+## 仓库结构
 
 ```text
 TestingAgent/
-├─ .claude-plugin/              # Claude Code 插件元数据
-├─ .opencode/                   # OpenCode 插件适配与安装说明
-├─ agents/                      # 审查 agent 定义
-├─ docs/                        # 设计文档
-├─ hooks/                       # SessionStart / Stop 等 hooks
-├─ scripts/                     # 初始化与恢复脚本
-├─ skills/                      # 7 个核心 skills
-├─ templates/                   # .supertester/ 工作文件模板
-├─ CLAUDE.md
-├─ AGENTS.md
-├─ package.json
-└─ README.md
+|-- .claude-plugin/              # Claude Code 插件元数据
+|-- .opencode/                   # OpenCode 适配层与安装说明
+|-- agents/                      # 独立审查 agent
+|-- docs/                        # 设计说明、分析报告
+|-- hooks/                       # SessionStart / Stop 等流程 hook
+|-- scripts/                     # 初始化与恢复脚本
+|-- skills/                      # Supertester 主流程技能
+|-- templates/                   # .supertester/ 工作文件模板
+|-- AGENTS.md
+|-- CLAUDE.md
+|-- package.json
+`-- README.md
 ```
 
-`skills/` 下当前包含：
+当前核心技能包括：
 
 - `using-supertester`
 - `requirement-analysis`
@@ -51,94 +175,82 @@ TestingAgent/
 - `automation-scripting`
 - `test-reporting`
 
-## 工作流输出
+## .supertester 产物目录
 
-插件运行后，会在目标项目里维护 `.supertester/` 目录，用来保存上下文和阶段产物。典型结构如下：
+插件运行后，会在目标项目里维护 `.supertester/` 目录，用来保存上下文、阶段结果和审查记录。
 
 ```text
 .supertester/
-├─ test_plan.md
-├─ findings.md
-├─ progress.md
-├─ requirements/
-│  ├─ parsed-requirements.md
-│  ├─ clarifications.json
-│  ├─ module-dependencies.md
-│  ├─ implicit-requirements.md
-│  └─ cross-module-scenarios.md
-├─ test-cases/
-│  ├─ functional-cases.md
-│  ├─ automation-analysis.md
-│  └─ deduplication-report.md
-├─ scripts/
-│  ├─ *.spec.ts
-│  └─ manual-cases.md
-├─ reviews/
-└─ reports/
+|-- test_plan.md
+|-- findings.md
+|-- progress.md
+|-- requirements/
+|   |-- parsed-requirements.md
+|   |-- clarifications.json
+|   |-- module-dependencies.md
+|   |-- implicit-requirements.md
+|   `-- cross-module-scenarios.md
+|-- test-cases/
+|   |-- functional-cases.md
+|   |-- automation-analysis.md
+|   `-- deduplication-report.md
+|-- scripts/
+|   |-- *.spec.ts
+|   `-- manual-cases.md
+|-- reviews/
+`-- reports/
 ```
 
-这套结构的目标不是只“生成一些测试内容”，而是把测试分析过程、决策依据、自动化边界和最终产物都保留下来。
+这套目录结构的意义，不只是“把结果写出来”，而是把测试设计过程也保存下来，方便后续恢复、审查和追溯。
 
-## 插件组成
+## 组件分工
 
 ### Skills
 
-`skills/` 是主能力层：
+`skills/` 是主流程层：
 
-- `using-supertester`：入口 skill，负责初始化和路由
-- `requirement-analysis`：解析需求、识别歧义、组织澄清
-- `requirement-association`：分析依赖、隐含需求、跨模块场景
-- `test-case-generation`：生成功能测试用例并去重
-- `automation-analysis`：将用例分类为 `automatable` / `partial` / `manual`
-- `automation-scripting`：为可自动化部分生成 Playwright 脚本
-- `test-reporting`：汇总阶段结果，输出测试报告
+- `using-supertester`：入口初始化、路由与状态恢复
+- `requirement-analysis`：需求解析、歧义发现、结构化澄清
+- `requirement-association`：模块依赖、隐含需求、跨模块场景和恢复/历史交互分析
+- `test-case-generation`：功能测试用例生成、保真度策略分配、去重
+- `automation-analysis`：自动化可行性判断
+- `automation-scripting`：Playwright 脚本生成
+- `test-reporting`：汇总覆盖、边界和最终报告
 
 ### Hooks
 
-`hooks/hooks.json` 当前定义了 5 个 hook：
+`hooks/hooks.json` 负责在关键节点注入流程控制和上下文补偿，例如：
 
-- `SessionStart`
-- `UserPromptSubmit`
-- `PreToolUse`
-- `PostToolUse`
-- `Stop`
+- 会话开始时初始化或恢复 `.supertester/`
+- 用户继续任务前注入当前阶段上下文
+- 编辑前后提醒同步进度
+- 停止前检查流程是否处于可恢复状态
 
-它们分别用于初始化会话、注入当前阶段上下文、在编辑前后提醒同步进度，以及在结束前检查流程是否完整。
+### Reviewer Agent
 
-### Templates
+`agents/test-reviewer.md` 是独立质量门禁，不直接生成资产，只负责发现：
 
-`templates/` 提供 3 个基础模板：
+- 覆盖缺口
+- 结构问题
+- 高保真资产丢失
+- 自动化边界误判
 
-- `test_plan.md`
-- `findings.md`
-- `progress.md`
+## 安装与接入
 
-### Scripts
+### Claude Code
 
-`scripts/` 当前包含：
+仓库已包含 Claude 插件元数据：
 
-- `init-session.sh`
-- `init-session.ps1`
-- `session-catchup.py`
+- [`.claude-plugin/plugin.json`](E:/workspace/aise/TestingAgent/.claude-plugin/plugin.json)
+- [`.claude-plugin/marketplace.json`](E:/workspace/aise/TestingAgent/.claude-plugin/marketplace.json)
 
-用于初始化 `.supertester/` 和恢复中断的工作会话。
+本地接入时，确保 `skills/`、`hooks/` 和 `agents/` 能被正确加载。
 
-## 安装方式
+### OpenCode
 
-### 1. 在 Claude Code 中作为本地插件使用
+OpenCode 适配入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/aise/TestingAgent/.opencode/plugins/supertester.js)，安装说明见 [`.opencode/INSTALL.md`](E:/workspace/aise/TestingAgent/.opencode/INSTALL.md)。
 
-仓库已经包含 Claude 插件元数据：
-
-- `.claude-plugin/plugin.json`
-- `.claude-plugin/marketplace.json`
-
-如果你是本地调试这个插件，通常会把仓库作为插件源接入 Claude Code，并确保插件目录中的 `skills/` 与 `hooks/` 可被加载。
-
-### 2. 在 OpenCode 中使用
-
-仓库已经提供 OpenCode 适配层，入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/aise/TestingAgent/.opencode/plugins/supertester.js)。
-
-可按 [`.opencode/INSTALL.md`](E:/workspace/aise/TestingAgent/.opencode/INSTALL.md) 的说明，在 `opencode.json` 中添加：
+示例配置：
 
 ```json
 {
@@ -146,28 +258,26 @@ TestingAgent/
 }
 ```
 
-重启 OpenCode 后，插件会注册 `skills/` 并自动注入 `using-supertester` 的引导内容。
+### 作为规则资产直接复用
 
-### 3. 作为仓库直接复用
-
-如果你只是想复用这套 skill 资产，也可以直接使用本仓库中的：
+如果你不是要直接安装插件，而是想复用这套测试工作流能力，也可以直接复用以下目录：
 
 - `skills/`
 - `hooks/`
 - `templates/`
 - `agents/test-reviewer.md`
 
-这种方式适合二次开发或迁移到其它 agent 平台。
+这更适合迁移到其他 agent 平台，或在现有测试工作流上做二次封装。
 
 ## 快速开始
 
-在接入插件后，可以直接给 agent 发自然语言任务，例如：
+接入后，可以直接给 agent 下达自然语言任务，例如：
 
 ```text
 分析 requirements/auth-prd.md，并生成测试方案
 ```
 
-或者从中间阶段开始：
+或者从中间阶段继续：
 
 ```text
 基于现有功能用例，继续做自动化可行性分析
@@ -176,47 +286,32 @@ TestingAgent/
 典型执行过程会是：
 
 1. 初始化 `.supertester/`
-2. 解析需求并输出结构化结果
-3. 发现模糊项时发起澄清
-4. 生成功能测试用例并经过审查
-5. 分析哪些用例适合自动化
-6. 生成 Playwright 脚本与最终报告
+2. 解析需求并产出结构化结果
+3. 对歧义和 PRD 外关键规则进行澄清
+4. 生成功能测试用例并经过 reviewer 审查
+5. 分析自动化边界并生成脚本
+6. 输出覆盖结构清晰的最终报告
 
-## 设计原则
-
-- 先理解需求，再生成测试资产
-- 把信息写入文件，而不是依赖短期上下文
-- 功能用例和自动化脚本分阶段生成
-- 由独立审查角色把关，而不是“自己写自己验”
-- 保留 manual/partial 场景，不强行全部自动化
-
-这些原则的详细说明可以参考 [docs/design.md](E:/workspace/aise/TestingAgent/docs/design.md)。
-
-## 适用场景
+## 适用边界
 
 适合：
 
-- 需求文档驱动的测试设计
-- 想把测试分析过程沉淀成文件资产的团队
-- Web 应用的 Playwright E2E 测试规划与脚本生成
-- 需要跨会话恢复上下文的长流程测试任务
+- 需求驱动的测试设计
+- Web 产品的 E2E 测试规划与自动化脚本生成
+- 需要追踪测试资产和决策链路的团队
+- 需要保留人工校验资产而不是强推全自动化的场景
 
-暂不等同于：
+不等同于：
 
 - 一个完整的测试执行平台
-- 一个带 `src/` 业务逻辑的传统 Node 应用
-- 所有场景都自动跑完的全托管测试系统
+- 一个内置业务运行时代码的传统 Node 应用
+- 一个所有场景都自动跑完的全托管测试系统
 
-## 开发说明
+## 参考文档
 
-当前 `package.json` 只声明了最小的插件信息：
-
-- 包名：`supertester`
-- 版本：`0.1.0`
-- 模块类型：`module`
-- OpenCode 入口：`.opencode/plugins/supertester.js`
-
-这也说明仓库重点在插件装配与 skill 编排，而不是运行时服务代码。
+- [设计说明](E:/workspace/aise/TestingAgent/docs/design.md)
+- [差异分析](E:/workspace/aise/TestingAgent/docs/2026-04-08-comparison.md)
+- [反向优化分析](E:/workspace/aise/TestingAgent/docs/2026-04-09-supertester-optimization-analysis.md)
 
 ## License
 
