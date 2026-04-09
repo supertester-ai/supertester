@@ -1,404 +1,222 @@
 # Supertester
 
-AI 驱动的软件测试智能体插件 — 从需求文档到 Playwright E2E 脚本的全流程测试工作流。
+面向 AI coding agent 的测试工作流插件，从需求分析一路推进到测试用例、自动化可行性判断、Playwright 脚本和最终测试报告。
 
-**零代码依赖** | **文件持久化** | **全程可追溯** | **独立审查**
+当前仓库的实现形态是“插件 + skills + hooks + 模板”，不是传统的 `src/` 应用。README 已按现状重写，适合作为仓库首页和接入说明。
 
-## 它做了什么
+## 它能做什么
 
-当你给 Supertester 一份需求文档时，它不会直接生成测试。它会：
+Supertester 把测试工作拆成一条可追踪的 6 阶段流程：
 
-1. **先理解需求** — 解析文档，发现模糊项，一个个问你直到搞清楚
-2. **分析模块关联** — 挖掘隐含需求，生成跨模块测试场景
-3. **智能生成用例** — 根据需求特征自动选择合适的测试方法（等价类、边界值、状态转换...），而非盲目全调用
-4. **标记自动化等级** — 每个用例标记为 automatable / partial / manual
-5. **生成 Playwright 脚本** — 只为已确认的可自动化用例生成代码
-6. **独立审查** — test-reviewer agent 在关键节点审查质量，不是自己验证自己
+1. 需求解析与澄清
+2. 需求关联与跨模块场景分析
+3. 功能测试用例生成
+4. 自动化可行性分析
+5. Playwright 脚本生成
+6. 测试报告生成
 
-整个过程的每一步都持久化为本地文件，支持中断恢复，每个测试用例可追溯到原始需求的文件和行号。
+核心特点：
 
-## 工作流程
+- 基于 `skills/` 提供阶段化能力，而不是单次大提示词
+- 基于 `.supertester/` 做文件级持久化，支持中断恢复
+- 基于 `hooks/` 在关键时机注入上下文，减少流程跑偏
+- 引入独立 `test-reviewer` 进行阶段审查
+- 支持把测试资产沉淀为 Markdown 和 Playwright 代码
 
-```
-<<<<<<< HEAD
-TestingAgent/
-├── SKILL.md              # ✅ opencode 技能入口文件
-├── README.md            # 使用文档
-├── LICENSE              # MIT 许可证
-├── .gitignore
-└── docs/
-    └── design.md        # 设计规格说明书
-```
-
-**说明：** opencode 技能是一个基于 `SKILL.md` 的 prompt 模板系统，不需要 npm 包或 JavaScript 源码。
-software-testing-agent/
-├── SKILL.md                    # 主技能文件
-├── README.md                   # 使用文档
-├── LICENSE                     # MIT 许可证
-├── src/
-│   ├── router.js              # 意图路由
-│   ├── requirements/
-│   │   ├── parser.js         # 解析需求文档
-│   │   ├── clarifier.js      # 需求澄清
-│   │   ├── session.js        # 对话状态持久化
-│   │   └── association.js    # 需求关联分析
-│   │       ├── dependency.js  # 模块依赖分析
-│   │       ├── implicit.js    # 隐含需求挖掘
-│   │       └── crossModule.js # 跨模块场景生成
-│   ├── functional/
-│   │   ├── index.js         # FCG 编排器
-│   │   ├── equivalence.js    # 等价类
-│   │   ├── boundary.js       # 边界值
-│   │   ├── exception.js      # 异常场景
-│   │   ├── state.js         # 状态转换
-│   │   ├── scenario.js       # 场景流
-│   │   ├── decisionTable.js  # 决策表
-│   │   ├── security.js       # 安全测试
-│   │   ├── performance.js    # 性能测试
-│   │   ├── deduplicator.js   # 去重
-│   │   └── templates/        # 用例模板
-│   ├── automation/
-│   │   ├── analyzer.js      # 自动化可行性分析
-│   │   ├── playwright.js     # Playwright 生成
-│   │   └── markers.js        # 自动化等级标记
-│   ├── formatter/
-│   │   ├── terminal.js       # 终端输出
-│   │   └── report.js         # 报告生成
-│   └── config.js             # 配置加载
-├── sessions/                  # 对话状态存储
-├── testing-agent.config.js   # 默认配置
-└── docs/
-    ├── design.md             # 设计规格
-    └── specs/                # 设计文档
-=======
-需求文档
-    |
-    v
-[Phase 1] 需求解析与澄清 ──> .supertester/requirements/parsed-requirements.md
-    |                          .supertester/requirements/clarifications.json
-    v
-[Phase 2] 需求关联分析 ──────> .supertester/requirements/module-dependencies.md
-    |        |                  .supertester/requirements/implicit-requirements.md
-    |        |                  .supertester/requirements/cross-module-scenarios.md
-    |        v
-    |    test-reviewer 审查
-    |        |
-    v        v
-    用户确认
-    |
-    v
-[Phase 3] 功能用例生成 ──────> .supertester/test-cases/functional-cases.md
-    |        |                  .supertester/test-cases/deduplication-report.md
-    |        v
-    |    test-reviewer 审查
-    |        |
-    v        v
-    用户确认
-    |
-    v
-[Phase 4] 自动化可行性分析 ──> .supertester/test-cases/automation-analysis.md
-    |
-    v
-[Phase 5] Playwright 脚本 ──> .supertester/scripts/*.spec.ts
-    |        |                  .supertester/scripts/manual-cases.md
-    |        v
-    |    test-reviewer 审查
-    |
-    v
-[Phase 6] 测试报告 ──────────> .supertester/reports/YYYY-MM-DD-<module>.md
->>>>>>> 7442b16 (refactor: redesign as Supertester - Superpowers-style skill plugin)
-```
-
-## 安装
-
-<<<<<<< HEAD
-### 安装
-
-```bash
-# 克隆仓库
-git clone https://gitcode.com/orion-c/TestingAgent.git
-cd TestingAgent
-```
-
-### 在 opencode 中配置
-
-**步骤 1：在你的项目中创建技能目录**
-
-```bash
-# 在你的项目根目录
-mkdir -p .claude/skills/testing-agent
-```
-
-**步骤 2：复制技能文件**
-
-```bash
-# 复制 SKILL.md
-cp TestingAgent/SKILL.md .claude/skills/testing-agent/
-
-# 复制设计文档（可选）
-cp -r TestingAgent/docs .claude/skills/testing-agent/
-```
-
-**步骤 3：重启 opencode**
-
-重启 opencode 后，技能会自动加载。
-
-### 验证安装
-
-在 opencode 中输入：
-
-```
-/test help
-```
-
-或直接使用：
-
-```
-帮我分析 requirements/auth-prd.md 中的测试需求
-```
-
-### 使用方式
-
-在 opencode 中直接输入自然语言：
-
-```
-帮我分析 requirements/auth-prd.md 中的测试需求
-```
-
-或使用内置命令：
-
-```
-/test parse requirements/auth-prd.md
-/test clarify
-/test functional for "登录模块"
-/test automate
-/test query "checkout 模块需要哪些测试？"
-```
-
-## 📖 工作流程
-=======
-### Claude Code (Plugin Marketplace)
-
-```bash
-# 从 marketplace 安装（发布后可用）
-/plugin install supertester
-```
-
-### 手动安装
-
-```bash
-# 克隆到本地
-git clone <repo-url> supertester
-
-# 复制到项目的 .claude/plugins/ 目录
-cp -r supertester ~/.claude/plugins/supertester
-```
-
-### Cursor
+## 当前仓库结构
 
 ```text
-/add-plugin supertester
+TestingAgent/
+├─ .claude-plugin/              # Claude Code 插件元数据
+├─ .opencode/                   # OpenCode 插件适配与安装说明
+├─ agents/                      # 审查 agent 定义
+├─ docs/                        # 设计文档
+├─ hooks/                       # SessionStart / Stop 等 hooks
+├─ scripts/                     # 初始化与恢复脚本
+├─ skills/                      # 7 个核心 skills
+├─ templates/                   # .supertester/ 工作文件模板
+├─ CLAUDE.md
+├─ AGENTS.md
+├─ package.json
+└─ README.md
 ```
+
+`skills/` 下当前包含：
+
+- `using-supertester`
+- `requirement-analysis`
+- `requirement-association`
+- `test-case-generation`
+- `automation-analysis`
+- `automation-scripting`
+- `test-reporting`
+
+## 工作流输出
+
+插件运行后，会在目标项目里维护 `.supertester/` 目录，用来保存上下文和阶段产物。典型结构如下：
+
+```text
+.supertester/
+├─ test_plan.md
+├─ findings.md
+├─ progress.md
+├─ requirements/
+│  ├─ parsed-requirements.md
+│  ├─ clarifications.json
+│  ├─ module-dependencies.md
+│  ├─ implicit-requirements.md
+│  └─ cross-module-scenarios.md
+├─ test-cases/
+│  ├─ functional-cases.md
+│  ├─ automation-analysis.md
+│  └─ deduplication-report.md
+├─ scripts/
+│  ├─ *.spec.ts
+│  └─ manual-cases.md
+├─ reviews/
+└─ reports/
+```
+
+这套结构的目标不是只“生成一些测试内容”，而是把测试分析过程、决策依据、自动化边界和最终产物都保留下来。
+
+## 插件组成
+
+### Skills
+
+`skills/` 是主能力层：
+
+- `using-supertester`：入口 skill，负责初始化和路由
+- `requirement-analysis`：解析需求、识别歧义、组织澄清
+- `requirement-association`：分析依赖、隐含需求、跨模块场景
+- `test-case-generation`：生成功能测试用例并去重
+- `automation-analysis`：将用例分类为 `automatable` / `partial` / `manual`
+- `automation-scripting`：为可自动化部分生成 Playwright 脚本
+- `test-reporting`：汇总阶段结果，输出测试报告
+
+### Hooks
+
+`hooks/hooks.json` 当前定义了 5 个 hook：
+
+- `SessionStart`
+- `UserPromptSubmit`
+- `PreToolUse`
+- `PostToolUse`
+- `Stop`
+
+它们分别用于初始化会话、注入当前阶段上下文、在编辑前后提醒同步进度，以及在结束前检查流程是否完整。
+
+### Templates
+
+`templates/` 提供 3 个基础模板：
+
+- `test_plan.md`
+- `findings.md`
+- `progress.md`
+
+### Scripts
+
+`scripts/` 当前包含：
+
+- `init-session.sh`
+- `init-session.ps1`
+- `session-catchup.py`
+
+用于初始化 `.supertester/` 和恢复中断的工作会话。
+
+## 安装方式
+
+### 1. 在 Claude Code 中作为本地插件使用
+
+仓库已经包含 Claude 插件元数据：
+
+- `.claude-plugin/plugin.json`
+- `.claude-plugin/marketplace.json`
+
+如果你是本地调试这个插件，通常会把仓库作为插件源接入 Claude Code，并确保插件目录中的 `skills/` 与 `hooks/` 可被加载。
+
+### 2. 在 OpenCode 中使用
+
+仓库已经提供 OpenCode 适配层，入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/aise/TestingAgent/.opencode/plugins/supertester.js)。
+
+可按 [`.opencode/INSTALL.md`](E:/workspace/aise/TestingAgent/.opencode/INSTALL.md) 的说明，在 `opencode.json` 中添加：
+
+```json
+{
+  "plugin": ["supertester@git+https://gitcode.com/orion-c/supertester.git"]
+}
+```
+
+重启 OpenCode 后，插件会注册 `skills/` 并自动注入 `using-supertester` 的引导内容。
+
+### 3. 作为仓库直接复用
+
+如果你只是想复用这套 skill 资产，也可以直接使用本仓库中的：
+
+- `skills/`
+- `hooks/`
+- `templates/`
+- `agents/test-reviewer.md`
+
+这种方式适合二次开发或迁移到其它 agent 平台。
 
 ## 快速开始
 
-### 完整流程：从需求到脚本
->>>>>>> 7442b16 (refactor: redesign as Supertester - Superpowers-style skill plugin)
+在接入插件后，可以直接给 agent 发自然语言任务，例如：
 
-```
-你: 分析 requirements/auth-prd.md 并生成测试
-
-Supertester:
-  > 初始化 .supertester/ 工作目录...
-  > 解析需求文档... 发现 4 个模块、12 个功能点
-  > 检测到 3 个模糊项，开始澄清：
-  >
-  > 最大登录尝试次数是多少？
-  > A) 3 次  B) 5 次  C) 无限制
-
-你: B
-
-Supertester:
-  > 已记录。下一个问题...
-  > (澄清完毕后)
-  > 需求关联分析完成，发现 2 个隐含需求、3 个跨模块场景
-  > test-reviewer 审查通过
-  > 请确认关联分析结果？[Y/n]
-
-你: Y
-
-Supertester:
-  > 生成功能测试用例... 45 个原始用例，去重后 28 个
-  > test-reviewer 审查通过
-  > 请确认功能用例？[Y/n]
-
-你: Y
-
-Supertester:
-  > 自动化分析: 18 automatable / 7 partial / 3 manual
-  > 生成 Playwright 脚本: 3 个 spec 文件
-  > 报告已生成: .supertester/reports/2026-04-07-auth.md
+```text
+分析 requirements/auth-prd.md，并生成测试方案
 ```
 
-### 中断恢复
+或者从中间阶段开始：
 
-如果会话中断（关闭终端、/clear、上下文满了），下次启动时：
-
-```
-Supertester:
-  > 检测到未完成的测试任务
-  > 当前进度: Phase 2（需求关联分析）in_progress
-  > 继续？[Y/n]
+```text
+基于现有功能用例，继续做自动化可行性分析
 ```
 
-所有进度保存在 `.supertester/` 目录，不丢失。
+典型执行过程会是：
 
-### 从中间阶段开始
+1. 初始化 `.supertester/`
+2. 解析需求并输出结构化结果
+3. 发现模糊项时发起澄清
+4. 生成功能测试用例并经过审查
+5. 分析哪些用例适合自动化
+6. 生成 Playwright 脚本与最终报告
 
-如果已有功能用例，可以跳过前几个阶段：
+## 设计原则
 
-```
-你: 为已有的功能用例生成自动化脚本
-  > 检测到 .supertester/test-cases/functional-cases.md
-  > 跳转到 Phase 4: 自动化可行性分析...
-```
+- 先理解需求，再生成测试资产
+- 把信息写入文件，而不是依赖短期上下文
+- 功能用例和自动化脚本分阶段生成
+- 由独立审查角色把关，而不是“自己写自己验”
+- 保留 manual/partial 场景，不强行全部自动化
 
-## 测试方法覆盖
+这些原则的详细说明可以参考 [docs/design.md](E:/workspace/aise/TestingAgent/docs/design.md)。
 
-Supertester 不是对每个需求调用所有生成器，而是先分析需求特征，再选择合适的方法：
+## 适用场景
 
-| 需求特征 | 自动选择的生成器 |
-|---------|----------------|
-| 有输入验证 | 等价类 + 边界值 |
-| 有状态变化 | 状态转换 + 场景流 |
-| 有复杂业务规则 | 决策表 + 等价类 |
-| 安全敏感 | 安全测试（OWASP） |
-| 性能关键 | 性能测试（负载/压力/峰值） |
-| 多模块交互 | 跨模块场景（关键路径/错误传导/并发） |
+适合：
 
-全部 8 种生成器：等价类、边界值、异常场景、状态转换、场景流、决策表、安全测试、性能测试。
+- 需求文档驱动的测试设计
+- 想把测试分析过程沉淀成文件资产的团队
+- Web 应用的 Playwright E2E 测试规划与脚本生成
+- 需要跨会话恢复上下文的长流程测试任务
 
-## 文件持久化
+暂不等同于：
 
-Supertester 将所有工作记忆写入磁盘文件，而非依赖上下文窗口：
+- 一个完整的测试执行平台
+- 一个带 `src/` 业务逻辑的传统 Node 应用
+- 所有场景都自动跑完的全托管测试系统
 
-```
-项目目录/
-└── .supertester/
-    ├── test_plan.md              # 阶段追踪 + 决策记录 + 错误日志
-    ├── findings.md               # 分析发现 + 知识库
-    ├── progress.md               # 会话日志 + 操作时间线
-    ├── requirements/             # Phase 1-2 输出
-    │   ├── parsed-requirements.md
-    │   ├── clarifications.json
-    │   ├── module-dependencies.md
-    │   ├── implicit-requirements.md
-    │   └── cross-module-scenarios.md
-    ├── test-cases/               # Phase 3-4 输出
-    │   ├── functional-cases.md
-    │   ├── automation-analysis.md
-    │   └── deduplication-report.md
-    ├── scripts/                  # Phase 5 输出
-    │   ├── *.spec.ts
-    │   └── manual-cases.md
-    ├── reviews/                  # test-reviewer 审查记录
-    │   └── review-<phase>-<timestamp>.md
-    └── reports/                  # Phase 6 输出
-        └── YYYY-MM-DD-<module>.md
-```
+## 开发说明
 
-### 为什么用文件而不是上下文
+当前 `package.json` 只声明了最小的插件信息：
 
-借鉴 [planning-with-files](https://github.com/nickarino/planning-with-files) 的核心原则：
+- 包名：`supertester`
+- 版本：`0.1.0`
+- 模块类型：`module`
+- OpenCode 入口：`.opencode/plugins/supertester.js`
 
-- **上下文窗口是内存** — 有限、易失，一次 /clear 就没了
-- **文件系统是磁盘** — 持久、无限，随时可恢复
-- **Hooks 自动操控注意力** — 每次用户消息前自动读取 test_plan.md，防止目标漂移
-
-## 需求追溯
-
-每个产物都携带上游溯源 ID，形成完整追溯链：
-
-```
-需求文档行号 → 需求ID(F-001) → 用例ID(TC-001) → 脚本注释(// TC-001 | F-001)
-```
-
-生成的 Playwright 脚本示例：
-
-```typescript
-// TC-001 | F-001 | auth-prd.md:45-48
-test('should login with valid email', async ({ page }) => {
-  await page.goto('/login');
-  await page.fill('[data-testid="email-input"]', 'test@example.com');
-  await page.fill('[data-testid="password-input"]', 'CorrectPassword123');
-  await page.click('[data-testid="login-btn"]');
-  await expect(page).toHaveURL('/dashboard');
-});
-```
-
-## 质量保证
-
-### 独立审查 Agent
-
-test-reviewer 是独立的审查 agent，在 Phase 2/3/5 自动触发：
-
-- **需求覆盖审查** — 每个需求是否都有对应用例
-- **用例质量审查** — 前置条件是否可执行、步骤是否无歧义
-- **脚本质量审查** — 代码是否可运行、选择器是否稳定
-
-审查发现 CRITICAL/HIGH 问题 → 修复 → 重新审查（最多 3 轮，之后升级到用户）。
-
-### 行为控制
-
-每个 Skill 内置 Superpowers 风格的行为控制：
-
-| 机制 | 说明 |
-|------|------|
-| **Iron Law** | 每个阶段的绝对禁令（如"不理解需求不准测试"） |
-| **Hard Gate** | 阻塞进入下一阶段的硬门禁（如"用例未审查不准提交"） |
-| **Red Flags** | Agent 自我说服的防御表（如"需求看起来清楚"→"做完检测才知道"） |
-| **2-Action Rule** | 每 2 个操作后必须写入文件，防信息丢失 |
-| **3-Strike Protocol** | 3 次失败后停止并升级到用户 |
-
-## 插件架构
-
-```
-supertester/
-├── .claude-plugin/          # 插件元数据
-├── hooks/                   # 5 个 Hooks (注意力操控)
-│   ├── session-start        # 注入 skill + 恢复上下文
-│   ├── user-prompt-submit   # 每次消息注入当前阶段
-│   ├── pre-tool-use         # Write/Edit 前重温目标
-│   ├── post-tool-use        # Write/Edit 后提醒更新进度
-│   └── stop                 # 验证所有阶段完成
-├── skills/                  # 7 个 Skills (测试工作流)
-│   ├── using-supertester/   # 入口 + 路由
-│   ├── requirement-analysis/
-│   ├── requirement-association/
-│   ├── test-case-generation/
-│   ├── automation-analysis/
-│   ├── automation-scripting/
-│   └── test-reporting/
-├── agents/                  # 独立审查 Agent
-│   └── test-reviewer.md
-├── templates/               # 3 文件持久化模板
-├── scripts/                 # 初始化 + 会话恢复
-└── package.json             # 零依赖
-```
-
-## 设计文档
-
-完整的架构设计、Skill 详细定义、数据结构和流程控制机制，见 [docs/design.md](docs/design.md)。
-
-## 致谢
-
-Supertester 的设计融合了以下项目的核心思想：
-
-| 项目 | 借鉴 |
-|------|------|
-| [Superpowers](https://github.com/obra/superpowers) | Skill 行为塑造（Iron Law / Hard Gate / Red Flags） |
-| [planning-with-files](https://github.com/nickarino/planning-with-files) | 3 文件持久化 + Hooks 注意力操控 + 会话恢复 |
-| [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | 架构参考（多 agent 编排模式） |
+这也说明仓库重点在插件装配与 skill 编排，而不是运行时服务代码。
 
 ## License
 
