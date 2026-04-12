@@ -1,345 +1,284 @@
 ---
 name: test-case-generation
-description: Use when generating functional test cases from analyzed requirements - intelligently selects sub-generators, applies fidelity strategies, deduplicates carefully, requires test-reviewer audit and user confirmation
+description: Use when generating functional test cases from analyzed requirements - intelligently selects sub-generators based on requirement characteristics, deduplicates results, requires test-reviewer audit and user confirmation
 ---
 
-# Skill 3: Functional Test Case Generation
+# Skill 3: 功能测试用例生成
 
 ## Iron Law
 
-> Select generators based on requirement traits. Do not blindly invoke all generators.
-> Test design is not only about behavior coverage; it must preserve high-value test assets and verification depth.
+> **按需求特征选择生成器，不盲目全部调用。**
+> 每个需求先分析特征，再决定调用哪些子生成器。
+
+> **测试设计不是只生成“行为用例”，还要保留关键测试资产。**
+> 如果需求中存在关键内容、规则、列表、状态断言、集成契约或证据链，它们不能在生成与去重过程中被概括丢失。
 
 <HARD-GATE>
-Do not proceed to `automation-analysis` before the user confirms the functional test cases.
-Do not submit functional cases to the user before `test-reviewer` has reviewed them.
+在用户确认功能用例之前，不准进入 automation-analysis 阶段。
+用例未经 test-reviewer 审查之前，不准提交给用户确认。
 </HARD-GATE>
 
-## Preconditions
+## 前置条件
 
-- Phase 2 status is `complete`
-- the user has confirmed the association analysis results
+- Phase 2 (requirement-association) Status: **complete**
+- 用户已确认关联分析结果
 
-## Core Workflow
+## 核心流程
 
-```text
-Confirmed requirements + association results + extracted test assets
-        |
-        v
-Requirement trait analysis
-        +
-Fidelity strategy selection
-        |
-        v
-Sub-generator selection
-        |
-        v
-Test case generation
-        |
-        v
-Deduplication with asset-protection rules
-        |
-        v
-test-reviewer audit
-        |
-        v
-User confirmation
+```
+已确认的需求 + 关联分析结果 + 测试资产
+         |
+         v
++--------------------------------------+
+|      需求特性 + 证据维度分析器          |
+| (分析需求类型 + 证据类型 -> 决定调用哪些生成器) |
++------------------+-------------------+
+                   |
+     +-------------+-------------+
+     |             |             |
+     v             v             v
+[生成器组合1]  [生成器组合2]  [生成器组合3]
+     |             |             |
+     +-------------+-------------+
+                   |
+                   v
+            +-------------+
+            |   去重引擎   |
+            +-------------+
+                   |
+                   v
+         test-reviewer 审查
+                   |
+                   v
+              用户确认
 ```
 
-## Generation Strategy
+## 生成策略
 
-Always reason on two axes:
+生成策略必须同时考虑两个维度：
+- **行为维度**: 这是输入校验、状态机、业务流程、复杂规则、安全或性能问题吗？
+- **证据维度**: 这个功能需要通过哪些观测面来证明正确？UI、API、状态/数据、事件、文件、消息、指标、外部系统？
 
-- **Behavior axis**: input validation, workflows, state transitions, rule combinations, security, performance
-- **Evidence axis**: UI, content, API, DB, event, file, log, metrics, external systems
+只有行为维度，没有证据维度，容易得到“功能看起来覆盖了，但验证深度不足”的用例。
 
-### New P0 Layer: Fidelity Strategy
+### 需求类型 -> 生成器映射
 
-Before picking sub-generators, assign one or more fidelity modes to each `F-xxx`.
+| 需求类型 | 必需生成器 | 可选生成器 |
+|----------|-----------|-----------|
+| API/函数（输入验证） | 等价类、边界值 | 异常场景 |
+| 工作流/业务流程 | 场景流、异常场景 | 等价类、边界值 |
+| 状态机模块 | 状态转换、场景流 | 边界值、异常场景 |
+| 复杂业务规则 | 决策表、等价类 | 边界值、安全测试 |
+| 安全敏感模块 | 安全测试、等价类 | 异常场景、边界值 |
+| 性能关键模块 | 性能测试、场景流 | 边界值 |
+| AI/LLM 调用模块 | Prompt 回归、场景流 | 异常场景、等价类 |
 
-| Fidelity Mode | When to use | Expected outcome |
-|---------------|-------------|------------------|
-| `enumeration_mode` | full lists, matrices, denylists, status sets | preserve full coverage instead of sampled examples |
-| `content_fidelity_mode` | exact copy, prompt content, templates, tooltips, email text | generate field-by-field or item-by-item verification |
-| `process_mode` | loading, progress, processing, scanning, staged feedback | generate intermediate-state verification cases |
-| `interruption_mode` | refresh, language switch, navigation away, retry, logout during processing | generate interruption and recovery cases |
-| `visual_fallback_mode` | image, logo, layout, style, media validation | generate manual or partial cases instead of silently dropping coverage |
-| `history_interaction_mode` | history tables, record lists, feeds, result lists | generate sorting / pagination / scrolling / empty-state coverage |
-| `contract_content_mode` | prompt, schema, output template, path format, export contract | generate structure and contract validation cases |
+### 证据维度 -> 生成要求
 
-Sub-generators tell you *what kind of logic to test*.
-Fidelity modes tell you *how detailed and how preserving the generated tests must be*.
+| 证据维度 | 生成要求 |
+|----------|---------|
+| UI / 内容 | 用例中明确要验证的界面元素、提示、输出内容，不得只写“显示正确” |
+| API / 接口 | 明确请求、响应、状态码、字段约束或错误返回 |
+| 状态 / 数据 | 明确对象、字段、状态、副作用或一致性要求 |
+| Event / Message | 明确事件触发、消息投递、消费或重试行为 |
+| File | 明确文件内容、格式、命名、生成时机、导入导出结果 |
+| Log / Metrics | 明确日志、指标、埋点或审计记录的预期 |
+| External System | 明确外部交互的前提、反馈、异常和验证方式 |
 
-## Requirement Type -> Generator Mapping
+如果一个功能在 parsed-requirements.md 中标记了多种证据类型，生成结果也必须体现多观测面验证，不能只保留其中最容易写的一种。
 
-| Requirement Type | Required Generators | Optional Generators |
-|------------------|---------------------|---------------------|
-| API / parameter validation | equivalence, boundary | exception |
-| workflow / business flow | scenario, exception | equivalence, boundary |
-| state machine | state transition, scenario | boundary, exception |
-| complex business rules | decision table, equivalence | boundary, security |
-| security-sensitive module | security, equivalence | exception, boundary |
-| performance-sensitive module | performance, scenario | boundary |
+## 9 个子生成器
 
-## Evidence Axis Requirements
+详细参考见 @generator-reference.md
 
-| Evidence Surface | Generation Requirement |
-|------------------|------------------------|
-| UI / content | specify exact text or element expectations, not "shows correctly" |
-| API | specify request/response/status/field contract |
-| DB / state | specify object/field/state changes and persistence behavior |
-| Event / message | specify trigger, emission, consumption, retry, or failure behavior |
-| File | specify file content, format, naming, or export/import outcome |
-| Log / metrics | specify expected log, metric, audit trail, or path |
-| External system | specify external preconditions, feedback, failure, and verification path |
+| # | 生成器 | 适用场景 | 输出类型 |
+|---|--------|---------|---------|
+| 1 | 等价类生成器 | 输入验证、参数校验 | positive/negative 分区 |
+| 2 | 边界值生成器 | 数值/字符串/集合边界 | 边界值用例 |
+| 3 | 异常场景生成器 | 网络/系统/数据/安全错误 | 异常流程用例 |
+| 4 | 状态转换生成器 | 有限状态机模块 | 状态转换用例 |
+| 5 | 场景流生成器 | 单模块端到端流程 | happy/alternative/error_recovery |
+| 6 | 决策表生成器 | 复杂业务规则、多条件组合 | 条件组合用例 |
+| 7 | 安全测试生成器 | 注入、认证、会话、API 安全 | OWASP 分类用例 |
+| 8 | 性能测试生成器 | 负载、压力、持久性、峰值 | 性能指标用例 |
+| 9 | Prompt 回归生成器 | 含 AI/LLM Prompt 调用的功能 | Prompt 完整性/变量替换/输出格式/约束遵守 |
 
-If multiple evidence surfaces matter, the test set must reflect multiple observation paths.
+### Prompt 回归生成器 (Generator #9)
 
-## Fidelity Strategy Triggers
+适用：需求中包含 AI/LLM Prompt 模板的功能（在 parsed-requirements.md 的 Prompt Inventory 中列出）
 
-The following are not optional hints. Treat them as direct mode triggers.
+生成以下用例类型：
+1. **Prompt 完整性用例**：验证实际发送给 LLM 的 Prompt 是否包含所有必要段落、规则和约束。用例中必须包含完整 Prompt 文本作为关键资产。
+2. **变量替换用例**：验证 Prompt 中的动态变量（如 `{{keyword}}`、`{{page_title}}`）是否被正确替换为实际值，不残留占位符。
+3. **输出格式用例**：验证 LLM 输出是否符合预期格式（JSON/HTML/纯文本/特定 schema）。
+4. **输出约束用例**：验证 Prompt 中声明的约束规则（如"不超过 120 字符""年份必须 2026""不输出 Markdown"）是否被 LLM 遵守。
 
-### Trigger `content_fidelity_mode`
+注意：Prompt 文本本身是核心业务逻辑资产，不得在生成或去重中被概括为"调用 AI 生成内容"。
 
-- copy as follows
-- content as follows
-- tooltip
-- email template
-- empty state
-- loading text
-- button text
-- prompt text
-- modal copy
+## 步骤详解
 
-### Trigger `process_mode`
+### Step 1: 需求特性分析
 
-- loading
-- progress
-- processing
-- scanning
-- analyzing
-- generating
-- staged status
+对每个功能 (F-xxx)：
+1. 分析其行为特征：有输入验证？有状态变化？有复杂规则？安全敏感？性能关键？
+2. 分析其证据特征：需要通过哪些观测面验证？是否存在关键测试资产？
+3. 判断是否存在以下高保真资产，后续不得被概括掉：
+   - 需要逐项校验的内容
+   - 需要保留完整枚举/矩阵的规则
+   - 必须验证的状态/数据副作用
+   - 必须覆盖的集成反馈或契约
+4. 根据映射表决定调用哪些生成器
+5. 为该功能选择合适的用例粒度：
+   - **单点用例**: 适合独立行为或单一规则
+   - **组合用例**: 适合矩阵、规则组合、共享资源、异常恢复
+   - **证据链用例**: 适合需要多观测面共同验证的功能
+6. 记录选择理由到 findings.md
 
-### Trigger `interruption_mode`
+### Step 2: 调用子生成器
 
-- refresh
-- retry
-- navigate away
-- switch language
-- switch tab
-- logout during processing
-- recover after failure
+按选择的生成器组合，为每个功能生成用例。每个用例必须包含：
+- 用例 ID (TC-xxx)
+- 所属模块和功能
+- 生成器来源
+- 前置条件
+- 测试步骤
+- 预期结果
+- 主要证据类型
+- 需求溯源（文件 + 行号）
 
-### Trigger `visual_fallback_mode`
+如果功能包含关键测试资产，至少满足以下规则：
+- **内容资产**: 用例中写出要校验的关键内容类型，不得只写“内容正确”
+- **规则/枚举资产**: 不能只用“代表值”替代完整规则；必要时生成矩阵用例或附带规则清单
+- **状态/数据断言**: 不能只写 UI 结果，必须写出状态变化或副作用。如果需求或上下文中提到了具体的存储对象（库表、字段、缓存键、消息队列），用例中必须指定到存储层级（如"users 表的 balance 字段减 1"），而不只写"配额减少"。如果存储层信息未在需求中出现，标注"存储层待开发确认"
+- **集成资产**: 必须覆盖成功、失败、超时、重试或降级中的相关路径
+- **约束/合约资产**: 必须生成校验规则本身的用例，而不只是主流程 happy path
+- **Prompt 资产**: 如果 Prompt Inventory 中存在该功能的 Prompt，必须生成包含完整 Prompt 文本的回归用例，不得概括为"调用 AI"
+- **多语言资产**: 如果 Multi-Language Inventory 中标注了多语言要求，必须为每种需测语言生成内容验证用例
+- **测试数据需求**: 如果用例依赖特定测试数据（第三方支付卡号、OAuth 测试账号、特定 IP 等），在用例中标注"需补充测试数据: [数据类型]"
 
-- image
-- logo
-- banner
-- visual
-- layout
-- style
-- media
+生成时优先遵循：
+- 精准覆盖优于平均铺开
+- 可验证优于抽象描述
+- 保留关键资产优于过度简化
+- 独立执行优于巨型混合用例
 
-### Trigger `history_interaction_mode`
+但不要把”独立执行”误解为”必须把所有复杂场景都拆碎”。当需求本身是组合规则、共享资源冲突或证据链验证时，应保留组合型用例。
 
-- history
-- records
-- list
-- pagination
-- sorting
-- infinite scroll
-- table
+### 通用补充规则: 中断恢复场景
 
-### Trigger `contract_content_mode`
+对每个包含”执行中/loading/分析中”等异步等待状态的功能，必须额外生成以下用例：
+1. **页面刷新恢复**：任务执行中刷新浏览器，任务状态和结果是否正确恢复
+2. **导航离开再返回**：任务执行中切换到其他菜单/页面再返回，任务状态是否保持
+3. **多语言/主题切换**（如适用）：切换后任务状态是否保持
 
-- prompt
-- schema
-- output format
-- path format
-- export path
-- log path
-- template fields
+这些场景的证据类型为：UI + Session/LocalStorage。不要遗漏——这是用户在真实使用中的高频行为。
 
-## Step 1: Analyze Requirement Traits
+### Step 3: 去重
 
-For each `F-xxx`:
+去重策略：
+- **exact_duplicate**: 相同输入、相同预期
+- **subset_duplicate**: 一个用例完全覆盖另一个
+- **redundant_boundary**: 边界值与等价类冗余
+- **overlapping_state**: 状态转换已被场景流覆盖
 
-1. analyze behavior traits
-2. analyze evidence surfaces
-3. identify high-value assets that must not be abstracted away
-4. assign fidelity modes
-5. choose sub-generators
-6. record the rationale in `findings.md`
+高价值资产保护规则：
+- 如果一个用例包含关键规则、完整枚举、关键内容校验、状态/数据断言、集成异常或证据链，则不能因为“主流程相似”被直接吞并
+- 如果两条用例行为相似，但观测面不同，则视为不同用例
+- 如果矩阵类资产无法完整塞入单条用例，应在 deduplication-report.md 中明确保留原因
+- “代表值用例”不能替代“完整规则列表本身是需求”的情况
 
-### Required Trait Checks
+合并规则：
+- 边界值 + 等价类冗余 -> 保留边界值
+- 异常场景覆盖正常场景 -> 保留异常场景
+- 单点 UI 用例与状态断言用例不互相吞并
+- 行为用例与证据链用例不互相吞并
 
-For each feature, explicitly ask:
+去重报告写入 `.supertester/test-cases/deduplication-report.md`
 
-- Does this feature require exact content verification?
-- Does it have important intermediate states?
-- Does it need interruption/recovery coverage?
-- Does it include visual/media assets that need manual or partial handling?
-- Does it include history/list behavior?
-- Does it include contract content such as prompt/schema/path/template rules?
+### Step 4: test-reviewer 审查
 
-## Step 2: Generate Test Cases
+调用 test-reviewer agent 审查：
+- 需求覆盖率（每个 F-xxx 是否都有用例）
+- 覆盖维度是否完整（行为、规则、状态、集成、证据链）
+- 用例质量（前置条件清晰？步骤无歧义？预期可验证？）
+- 溯源准确性
+- 生成器选择合理性
+- 去重彻底性
+- 是否在简化过程中丢失关键测试资产
+- 是否存在“只覆盖表层行为，未覆盖观测证据”的情况
 
-Each generated case must include:
+CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 
-- test case ID (`TC-xxx`)
-- module and feature
-- generator source
-- fidelity mode(s)
-- preconditions
-- test steps
-- expected results
-- primary evidence surfaces
-- requirement traceability (file + line)
+### Step 5: 用户确认
 
-### Asset Preservation Rules
+向用户展示：
+- 用例统计（原始数 vs 去重后）
+- 按模块分组的用例列表
+- 审查结果摘要
 
-If a feature includes high-value assets:
+用户确认后更新 test_plan.md Phase 3 -> complete。
 
-- **Content assets**: generate explicit content checks, not vague content assertions
-- **Rule / enum assets**: preserve full lists or matrix logic where the full set is the requirement
-- **State / data assets**: include state changes, side effects, persistence, history, or audit expectations
-- **Integration assets**: include success, failure, timeout, retry, downgrade, or callback expectations
-- **Contract content assets**: generate structure-level validation and field-level validation where needed
-- **Visual assets**: if direct automation is not appropriate, generate a `manual` or `partial` case instead of omitting it
-
-### P0 Case Patterns To Force When Triggered
-
-If the feature has `process_mode`, generate at least one case for:
-
-- intermediate status visibility
-- transition order between major stages
-
-If the feature has `interruption_mode`, generate at least one case for:
-
-- interrupted-in-progress recovery or reset behavior
-
-If the feature has `history_interaction_mode`, generate cases for the applicable list mechanics:
-
-- sorting
-- pagination
-- scrolling / lazy loading
-- empty state
-
-If the feature has `contract_content_mode`, generate at least one case for:
-
-- structure correctness
-- required fields or sections
-
-If the feature has `content_fidelity_mode`, prefer itemized checks over generalized "copy is correct".
-
-## Step 3: Deduplicate Carefully
-
-Deduplication categories:
-
-- `exact_duplicate`
-- `subset_duplicate`
-- `redundant_boundary`
-- `overlapping_state`
-
-### Asset Protection Rules
-
-Do not deduplicate away a case merely because its main flow looks similar when it preserves a distinct high-value asset, such as:
-
-- exact copy or template verification
-- intermediate process-state verification
-- interruption/recovery verification
-- history interaction verification
-- distinct evidence surfaces
-- contract structure validation
-- manual/partial visual verification
-
-If in doubt, keep the case and explain why in `deduplication-report.md`.
-
-## Step 4: test-reviewer Audit
-
-Call `test-reviewer` to review:
-
-- requirement coverage
-- fidelity-mode correctness
-- asset preservation quality
-- generator selection quality
-- deduplication quality
-- whether process/interruption/history/visual/contract gaps remain
-
-CRITICAL or HIGH issues must be fixed before user review.
-
-## Step 5: User Confirmation
-
-Present:
-
-- original vs deduplicated counts
-- cases grouped by module
-- review summary
-
-After confirmation, update Phase 3 to `complete`.
-
-## Output Format (`functional-cases.md`)
+## 输出格式 (functional-cases.md)
 
 ```markdown
-# Functional Test Cases
+# 功能测试用例
 
-## Generation Summary
-- Raw case count: N
-- Deduplicated count: M
-- See deduplication details: deduplication-report.md
+## 生成统计
+- 原始用例数: N
+- 去重后: M
+- 去重详情见: deduplication-report.md
 
-## TC-001: [Case Name]
-- **Module:** [Module Name]
-- **Feature:** F-001 [Feature Name]
-- **Generator:** [Generator Name]
-- **Fidelity Modes:** enumeration_mode | content_fidelity_mode | process_mode | interruption_mode | visual_fallback_mode | history_interaction_mode | contract_content_mode
-- **Evidence Surfaces:** UI | API | DB | Event | File | Message | Log | Metrics | External System
+---
 
-### Preconditions
-- [condition 1]
-- [condition 2]
+## TC-001: [用例名称]
+**模块:** [模块名]
+**功能:** F-001 [功能名]
+**生成器:** [生成器名]（[正向/反向/边界]）
+**证据类型:** UI | API | DB | Event | File | Message | Log | Metrics | External System
 
-### Test Steps
-1. [step 1]
-2. [step 2]
+### 前置条件
+- [条件1]
+- [条件2]
 
-### Expected Results
-- [result 1]
-- [result 2]
+### 测试步骤
+1. [步骤1]
+2. [步骤2]
 
-### Requirement Traceability
-| Source File | Lines | Original Text |
-|-------------|-------|---------------|
-| `<filename>` | XX-YY | "Original text" |
+### 预期结果
+- [结果1]
+- [结果2]
 
-### Preserved Assets
-- [exact copy / matrix / state assertion / prompt template / visual fallback note]
+### 需求溯源
+| 来源文件 | 行号 | 原始需求文本 |
+|----------|------|-------------|
+| `<filename>` | XX-XX | "原始文本" |
+
+### 关键资产
+- [需要保留的规则/列表/内容/状态断言；若无则写“无”]
 ```
 
-## 2-Action Rule
+## 2-Action Rule 落地
 
-- after generating cases for 2 features, append to `functional-cases.md`
-- after 2 rounds of deduplication analysis, update `deduplication-report.md`
+- 为 2 个功能生成了用例 -> 立即追加到 functional-cases.md
+- 完成了 2 轮去重分析 -> 立即更新 deduplication-report.md
 
 ## Red Flags
 
-| If you think... | Reality is... |
-|-----------------|---------------|
-| "The generator choice is enough" | Without fidelity strategy, high-value details still disappear. |
-| "We can sample a few values from the list" | If the list itself is the requirement, sampling is a coverage bug. |
-| "Intermediate states are implied by the final state" | Process feedback is a separate verification target. |
-| "Visual checks are not automatable, so skip them" | They must be preserved as manual or partial coverage. |
-| "Prompt/template validation is overkill" | In AI systems, prompt/template content often is the contract. |
-| "History lists are just UI polish" | Sorting/pagination/scroll behavior is often core product behavior. |
+| 如果你在想... | 现实是... |
+|--------------|------------|
+| "先生成再说" | 不分析特征就全调用所有生成器 = 大量冗余用例 |
+| "全部调用所有生成器最安全" | 违反 Iron Law，浪费用户审核时间 |
+| "去重不重要" | 重复用例降低用户信任度 |
+| "跳过审查直接给用户" | 违反 Hard Gate，test-reviewer 必须先审查 |
+| "用例太多了" | 数量不等于质量。精准覆盖 > 全面铺开 |
+| "有主流程就算覆盖了" | 如果缺少规则、状态、集成或证据链覆盖，仍然会遗漏高价值测试点 |
+| "代表值足够了" | 当完整列表、矩阵或约束本身是需求时，代表值不能替代完整覆盖 |
 
-## Completion Criteria
+## 本阶段完成标准
 
-Phase 3 is complete only when:
-
-- every `F-xxx` has behavior coverage
-- high-value assets are preserved
-- fidelity modes have been applied where needed
-- process/interruption/history/contract/visual gaps are not silently dropped
-- multi-surface evidence needs are reflected in the case set
-- reviewer confirms no obvious coverage-dimension gaps remain
+只有同时满足下面条件，Phase 3 才算完成：
+- 每个 F-xxx 都至少有行为层覆盖
+- 关键规则、列表、内容和状态断言未在生成或去重中丢失
+- 多证据类型功能已体现多观测面验证
+- 复杂组合规则已通过组合用例或矩阵方式保留
+- reviewer 已确认不存在明显的覆盖维度缺口
