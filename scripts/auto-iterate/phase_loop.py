@@ -22,7 +22,7 @@ def iterate(phase: str, module_name: str,
             skill_dir: str, snapshot_root: str, iter_root: str,
             abstraction_map: dict, skill_files: list = None,
             max_revise_attempts: int = 2,
-            prompt_dir: str = None, model: str = "sonnet",
+            prompt_dir: str = None, models: dict = None,
             timeout: int = 300) -> dict:
     """通用迭代循环。
 
@@ -41,6 +41,9 @@ def iterate(phase: str, module_name: str,
     """
     if skill_files is None:
         skill_files = []
+    if models is None:
+        models = {"score": "sonnet", "analyze": "sonnet",
+                  "review": "sonnet", "revise": "sonnet"}
 
     history = []
     last_score = None
@@ -59,7 +62,7 @@ def iterate(phase: str, module_name: str,
             ai_output=ai_output, baseline_a=baseline_a,
             output_path=str(iter_dir / "score.json"),
             convergence=convergence, prompt_dir=prompt_dir,
-            model=model, timeout=timeout,
+            model=models["score"], timeout=timeout,
         )
         last_score = score
         history.append({
@@ -83,7 +86,7 @@ def iterate(phase: str, module_name: str,
             score=score, skill_content=skill_content,
             iteration_history=history, abstraction_map=abstraction_map,
             iter_dir=str(iter_dir), max_revise_attempts=max_revise_attempts,
-            prompt_dir=prompt_dir, model=model, timeout=timeout,
+            prompt_dir=prompt_dir, models=models, timeout=timeout,
         )
 
         if analysis.get("skip_apply"):

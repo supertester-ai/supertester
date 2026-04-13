@@ -66,7 +66,7 @@ def revise_patch(original_patch: dict, review_issues: list,
 def run_analysis_cycle(score: dict, skill_content: str,
                        iteration_history: list, abstraction_map: dict,
                        iter_dir: str, max_revise_attempts: int = 2,
-                       prompt_dir: str = None, model: str = "sonnet",
+                       prompt_dir: str = None, models: dict = None,
                        timeout: int = 300) -> dict:
     """Complete analysis -> review -> revise cycle.
 
@@ -77,13 +77,16 @@ def run_analysis_cycle(score: dict, skill_content: str,
         "review_history": [...]
     }
     """
+    if models is None:
+        models = {"analyze": "sonnet", "review": "sonnet", "revise": "sonnet"}
+
     iter_path = Path(iter_dir)
     iter_path.mkdir(parents=True, exist_ok=True)
 
     patch = generate_patch(
         score, skill_content, iteration_history, abstraction_map,
         str(iter_path / "patch.json"),
-        prompt_dir=prompt_dir, model=model, timeout=timeout,
+        prompt_dir=prompt_dir, model=models["analyze"], timeout=timeout,
     )
 
     review_history = []
@@ -92,7 +95,7 @@ def run_analysis_cycle(score: dict, skill_content: str,
         review = review_patch(
             patch, skill_content,
             str(iter_path / f"review{suffix}.json"),
-            prompt_dir=prompt_dir, model=model, timeout=timeout,
+            prompt_dir=prompt_dir, model=models["review"], timeout=timeout,
         )
         review_history.append(review)
         if review["verdict"] == "PASS":
@@ -106,7 +109,7 @@ def run_analysis_cycle(score: dict, skill_content: str,
         patch = revise_patch(
             patch, review.get("issues", []),
             str(iter_path / f"patch-revised-{attempt + 1}.json"),
-            prompt_dir=prompt_dir, model=model, timeout=timeout,
+            prompt_dir=prompt_dir, model=models["revise"], timeout=timeout,
         )
 
     return {

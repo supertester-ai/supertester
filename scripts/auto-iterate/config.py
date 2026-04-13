@@ -16,7 +16,17 @@ class Config:
     prompt_dir: str = str(PROJECT_ROOT / "prompts")
 
     # Claude CLI
+    # 默认 model 用于未细分的调用 / 测试 fallback
     model: str = "sonnet"
+    # 按任务分模型: 生成与差距分析吃推理 → opus；评分/审查/基准提取 → sonnet
+    models: dict = field(default_factory=lambda: {
+        "baseline": "sonnet",            # Phase 0 基准反向提取
+        "generate": "claude-opus-4-6",   # Phase 1/2/3 生成（核心产物）
+        "score":    "sonnet",            # 双基准打分（机械对比）
+        "analyze":  "claude-opus-4-6",   # 差距分析 + patch 生成（最吃抽象推理）
+        "review":   "sonnet",            # patch 通用性审查（清单式）
+        "revise":   "sonnet",            # patch 修订（机械重写）
+    })
     timeout: int = 1800  # 30 min — Phase 1/3 生成大型产物需要多轮推理
     max_patch_revise_attempts: int = 2
 

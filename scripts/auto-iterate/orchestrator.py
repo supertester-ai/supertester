@@ -37,7 +37,7 @@ def run_phase1(config: Config, state: State, baselines: dict):
         prd_content=prd_content,
         skill_dir=config.skill_dir,
         output_root=f"{config.output_dir}/iterations/phase1",
-        prompt_dir=config.prompt_dir, model=config.model,
+        prompt_dir=config.prompt_dir, model=config.models["generate"],
         timeout=config.timeout,
     )
     result = iterate(
@@ -51,7 +51,7 @@ def run_phase1(config: Config, state: State, baselines: dict):
         skill_files=["skills/requirement-analysis/SKILL.md",
                      "skills/requirement-analysis/clarification-patterns.md"],
         max_revise_attempts=config.max_patch_revise_attempts,
-        prompt_dir=config.prompt_dir, model=config.model,
+        prompt_dir=config.prompt_dir, models=config.models,
         timeout=config.timeout,
     )
     state.phase1_converged = result["converged"]
@@ -90,7 +90,7 @@ def run_phase2(config: Config, state: State, baselines: dict,
         parsed_requirements=parsed_requirements,
         skill_dir=config.skill_dir,
         output_root=f"{config.output_dir}/iterations/phase2",
-        prompt_dir=config.prompt_dir, model=config.model,
+        prompt_dir=config.prompt_dir, model=config.models["generate"],
         timeout=config.timeout,
     )
     result = iterate(
@@ -103,7 +103,7 @@ def run_phase2(config: Config, state: State, baselines: dict,
         abstraction_map=config.abstraction_map,
         skill_files=["skills/requirement-association/SKILL.md"],
         max_revise_attempts=config.max_patch_revise_attempts,
-        prompt_dir=config.prompt_dir, model=config.model,
+        prompt_dir=config.prompt_dir, models=config.models,
         timeout=config.timeout,
     )
     state.phase2_converged = result["converged"]
@@ -221,7 +221,7 @@ def main():
     if not state.phase0_complete or not baselines_path.exists():
         baselines = run_phase0(
             matched, config.output_dir,
-            config.prompt_dir, config.model, config.timeout,
+            config.prompt_dir, config.models["baseline"], config.timeout,
         )
         state.phase0_complete = True
         state.save()
