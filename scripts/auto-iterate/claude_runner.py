@@ -83,8 +83,8 @@ def extract_json(text: str):
     """
     text = text.strip()
 
-    # 尝试 ```json ... ``` fence
-    m = re.search(r'```(?:json)?\s*\n(.*?)\n```', text, re.DOTALL)
+    # 尝试 ```json ... ``` fence (允许 fence 末尾无 newline)
+    m = re.search(r'```(?:json)?\s*\n(.*?)\n?```', text, re.DOTALL)
     if m:
         try:
             return json.loads(m.group(1))
@@ -110,7 +110,8 @@ def extract_json(text: str):
 
 
 def claude_call(prompt: str, output: str, parse_json: bool = False,
-                model: str = "sonnet", timeout: int = 300):
+                model: str = "sonnet", timeout: int = 300,
+                max_turns: int = 30):
     """调用 claude -p，prompt 通过 stdin 传入，结果写入 output 文件。
 
     Args:
@@ -131,7 +132,7 @@ def claude_call(prompt: str, output: str, parse_json: bool = False,
         claude_exe, "-p",
         "--model", model,
         "--output-format", "text",
-        "--max-turns", "1",
+        "--max-turns", str(max_turns),
     ]
 
     # Windows 上 Claude Code 需要 git-bash
