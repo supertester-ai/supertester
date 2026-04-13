@@ -17,7 +17,7 @@ class Config:
 
     # Claude CLI
     model: str = "sonnet"
-    timeout: int = 300
+    timeout: int = 1800  # 30 min — Phase 1/3 生成大型产物需要多轮推理
     max_patch_revise_attempts: int = 2
 
     # 收敛标准
