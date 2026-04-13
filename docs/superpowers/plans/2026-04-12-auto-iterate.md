@@ -61,11 +61,13 @@ __pycache__/
 
 ## Setup
 
+使用 [uv](https://docs.astral.sh/uv/) 管理虚拟环境和依赖。
+
 ```bash
 cd scripts/auto-iterate
-py -m venv .venv
-source .venv/Scripts/activate  # Git Bash
-pip install -r requirements.txt
+uv venv                              # 创建 .venv (首次)
+source .venv/Scripts/activate        # Git Bash
+uv pip install -r requirements.txt   # 安装依赖
 ```
 
 ## Run
@@ -80,13 +82,13 @@ python orchestrator.py --module "URL通用校验"  # 只跑特定模块
 详见 `docs/superpowers/specs/2026-04-12-auto-iterate-design.md`。
 ```
 
-- [ ] **Step 6: 创建 venv 并安装依赖**
+- [ ] **Step 6: 创建 venv 并安装依赖 (使用 uv)**
 
 ```bash
 cd scripts/auto-iterate
-py -m venv .venv
+uv venv
 source .venv/Scripts/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 Expected: pytest/unidiff/jinja2 安装成功。
