@@ -22,8 +22,9 @@ def test_extract_json_missing_returns_none():
     assert extract_json('no json here') is None
 
 
+@patch('claude_runner.shutil.which', return_value='/fake/path/claude')
 @patch('claude_runner.subprocess.run')
-def test_claude_call_writes_output(mock_run, tmp_path):
+def test_claude_call_writes_output(mock_run, mock_which, tmp_path):
     """Test that claude_call writes output to file."""
     mock_run.return_value = MagicMock(stdout='hello world', returncode=0)
     out = tmp_path / "out.txt"
@@ -32,8 +33,9 @@ def test_claude_call_writes_output(mock_run, tmp_path):
     assert out.read_text(encoding='utf-8') == "hello world"
 
 
+@patch('claude_runner.shutil.which', return_value='/fake/path/claude')
 @patch('claude_runner.subprocess.run')
-def test_claude_call_parses_json(mock_run, tmp_path):
+def test_claude_call_parses_json(mock_run, mock_which, tmp_path):
     """Test that claude_call can parse JSON response."""
     mock_run.return_value = MagicMock(stdout='```json\n{"x": 42}\n```', returncode=0)
     out = tmp_path / "out.json"

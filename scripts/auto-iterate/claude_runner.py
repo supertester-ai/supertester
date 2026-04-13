@@ -1,7 +1,75 @@
+import os
 import subprocess
+import shutil
 import json
 import re
+import sys
 from pathlib import Path
+
+
+def _resolve_git_bash() -> str | None:
+    """Windows 上探测 git-bash 路径，用于 CLAUDE_CODE_GIT_BASH_PATH。
+
+    Returns: bash.exe 绝对路径，或 None (非 Windows / 未找到)
+    """
+    if sys.platform != "win32":
+        return None
+
+    # 1. 已存在环境变量则尊重
+    existing = os.environ.get("CLAUDE_CODE_GIT_BASH_PATH")
+    if existing and Path(existing).exists():
+        return existing
+
+    # 2. 探测常见 git 安装路径 (排除 WSL/WindowsApps 的 bash)
+    candidates = [
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+        r"D:\Git\bin\bash.exe",
+        r"D:\Program Files\Git\bin\bash.exe",
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return c
+
+    # 3. PATH 中查找 (过滤 WindowsApps / System32)
+    bash_exe = shutil.which("bash")
+    if bash_exe and "WindowsApps" not in bash_exe and "System32" not in bash_exe:
+        return bash_exe
+
+    return None
+
+
+def _resolve_claude_executable() -> str:
+    """跨平台解析 claude 可执行文件路径。
+
+    Windows 上 claude 是 .cmd/.bat 包装器，subprocess 需要完整路径。
+    """
+    exe = shutil.which("claude")
+    if exe is None:
+        raise RuntimeError(
+            "Could not find 'claude' executable in PATH. "
+            "Ensure Claude Code CLI is installed."
+        )
+    return exe
+
+
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+
+# FCF Proxy / 类似包装器在输出开头打印的 box-drawing banner，需要跳过
+_BANNER_BOX_RE = re.compile(
+    r'^(\s*\+[-]+\+\s*\n(\s*\|[^\n]*\|\s*\n){1,5}\s*\+[-]+\+\s*\n)+',
+    re.MULTILINE,
+)
+
+
+def _strip_ansi(text: str) -> str:
+    """去除 ANSI 转义序列 (颜色码等)"""
+    return _ANSI_RE.sub('', text)
+
+
+def _strip_banner(text: str) -> str:
+    """去除输出开头的 ASCII box banner (如 FCF Proxy banner)"""
+    return _BANNER_BOX_RE.sub('', text, count=1)
 
 
 def extract_json(text: str):
@@ -58,12 +126,20 @@ def claude_call(prompt: str, output: str, parse_json: bool = False,
     Raises:
         RuntimeError: 如果 claude 命令返回非零退出码
     """
+    claude_exe = _resolve_claude_executable()
     cmd = [
-        "claude", "-p",
+        claude_exe, "-p",
         "--model", model,
         "--output-format", "text",
         "--max-turns", "1",
     ]
+
+    # Windows 上 Claude Code 需要 git-bash
+    env = os.environ.copy()
+    if sys.platform == "win32" and not env.get("CLAUDE_CODE_GIT_BASH_PATH"):
+        bash_path = _resolve_git_bash()
+        if bash_path:
+            env["CLAUDE_CODE_GIT_BASH_PATH"] = bash_path
 
     result = subprocess.run(
         cmd,
@@ -72,6 +148,7 @@ def claude_call(prompt: str, output: str, parse_json: bool = False,
         text=True,
         timeout=timeout,
         encoding='utf-8',
+        env=env,
     )
 
     if result.returncode != 0:
@@ -79,7 +156,7 @@ def claude_call(prompt: str, output: str, parse_json: bool = False,
             f"claude -p failed (code {result.returncode}): {result.stderr}"
         )
 
-    response = result.stdout.strip()
+    response = _strip_banner(_strip_ansi(result.stdout)).strip()
 
     # 确保输出目录存在
     Path(output).parent.mkdir(parents=True, exist_ok=True)
