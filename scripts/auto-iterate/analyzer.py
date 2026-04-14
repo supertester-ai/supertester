@@ -9,10 +9,46 @@ def _render(prompt_dir: str, name: str, **kwargs) -> str:
     return Template(text).render(**kwargs)
 
 
+def _load_manual_override(path: str) -> dict | None:
+    """If a .manual sidecar JSON exists, use it instead of calling Claude.
+
+    Allows resuming after a parse failure by manually fixing the JSON.
+    E.g. if patch.json failed, write patch.json.manual with corrected JSON.
+    """
+    manual = Path(path + ".manual")
+    if manual.exists():
+        try:
+            return json.loads(manual.read_text(encoding='utf-8'))
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Manual override {manual} is invalid JSON: {e}")
+    return None
+
+
+def _diag(raw_path: str, kind: str) -> str:
+    """Build actionable error message with raw response preview + recovery hint."""
+    p = Path(raw_path)
+    preview = ""
+    if p.exists():
+        text = p.read_text(encoding='utf-8')
+        head = text[:400].replace('\n', ' | ')
+        tail = text[-400:].replace('\n', ' | ') if len(text) > 400 else ""
+        preview = f"\n  head: {head!r}\n  tail: {tail!r}\n  size: {len(text)} chars"
+    return (
+        f"Failed to parse {kind} JSON at {raw_path}.{preview}\n"
+        f"  RECOVERY: inspect the file, fix JSON (likely unescaped quotes in string fields), "
+        f"save as {raw_path}.manual, then rerun orchestrator.py — it will reuse the manual file."
+    )
+
+
 def generate_patch(score: dict, skill_content: str,
                    iteration_history: list, abstraction_map: dict,
                    output_path: str, prompt_dir: str = None,
                    model: str = "sonnet", timeout: int = 300) -> dict:
+    override = _load_manual_override(output_path)
+    if override is not None:
+        print(f"[analyzer] Using manual override: {output_path}.manual", flush=True)
+        return override
+
     if prompt_dir is None:
         prompt_dir = str(Path(__file__).parent / "prompts")
     prompt = _render(
@@ -25,13 +61,18 @@ def generate_patch(score: dict, skill_content: str,
     result = claude_call(prompt, output_path, parse_json=True,
                          model=model, timeout=timeout)
     if result is None:
-        raise RuntimeError("Failed to parse patch JSON")
+        raise RuntimeError(_diag(output_path, "patch"))
     return result
 
 
 def review_patch(patch: dict, skill_content: str, output_path: str,
                  prompt_dir: str = None, model: str = "sonnet",
                  timeout: int = 300) -> dict:
+    override = _load_manual_override(output_path)
+    if override is not None:
+        print(f"[analyzer] Using manual override: {output_path}.manual", flush=True)
+        return override
+
     if prompt_dir is None:
         prompt_dir = str(Path(__file__).parent / "prompts")
     prompt = _render(
@@ -42,13 +83,18 @@ def review_patch(patch: dict, skill_content: str, output_path: str,
     result = claude_call(prompt, output_path, parse_json=True,
                          model=model, timeout=timeout)
     if result is None:
-        raise RuntimeError("Failed to parse review JSON")
+        raise RuntimeError(_diag(output_path, "review"))
     return result
 
 
 def revise_patch(original_patch: dict, review_issues: list,
                  output_path: str, prompt_dir: str = None,
                  model: str = "sonnet", timeout: int = 300) -> dict:
+    override = _load_manual_override(output_path)
+    if override is not None:
+        print(f"[analyzer] Using manual override: {output_path}.manual", flush=True)
+        return override
+
     if prompt_dir is None:
         prompt_dir = str(Path(__file__).parent / "prompts")
     prompt = _render(
@@ -59,7 +105,7 @@ def revise_patch(original_patch: dict, review_issues: list,
     result = claude_call(prompt, output_path, parse_json=True,
                          model=model, timeout=timeout)
     if result is None:
-        raise RuntimeError("Failed to parse revised patch JSON")
+        raise RuntimeError(_diag(output_path, "revised patch"))
     return result
 
 

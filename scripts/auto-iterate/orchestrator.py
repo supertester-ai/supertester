@@ -195,6 +195,8 @@ def main():
                         help="只跑指定模块 (仅对 Phase 3 有效)")
     parser.add_argument("--status", action="store_true",
                         help="查看当前进度然后退出")
+    parser.add_argument("--force-phase0", action="store_true",
+                        help="忽略已有 baselines，强制重跑 Phase 0")
     args = parser.parse_args()
 
     config = Config()
@@ -218,7 +220,30 @@ def main():
         f"{sum(1 for m in matched if m.get('ref_cases'))} matched")
 
     baselines_path = Path(config.output_dir) / "baselines"
-    if not state.phase0_complete or not baselines_path.exists():
+
+    def _load_baselines() -> dict | None:
+        """加载磁盘上的 baseline，若内容空（all empty）返回 None"""
+        if not baselines_path.exists():
+            return None
+        try:
+            loaded = {
+                phase: json.loads((baselines_path / f"{phase}-baseline.json").read_text(encoding='utf-8'))
+                for phase in ["phase1", "phase2", "phase3"]
+            }
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            log(f"Baseline files unreadable: {e}")
+            return None
+        # 全空检测：三个 phase 全是 {} → 视为无效 baseline
+        if not any(loaded[p] for p in ["phase1", "phase2", "phase3"]):
+            log("Existing baselines are empty — will rerun Phase 0")
+            return None
+        return loaded
+
+    force = args.force_phase0 or (args.phase == 0)
+    cached = None if force else _load_baselines()
+
+    if cached is None:
+        log("Running Phase 0 baseline extraction")
         baselines = run_phase0(
             matched, config.output_dir,
             config.prompt_dir, config.models["baseline"], config.timeout,
@@ -226,10 +251,8 @@ def main():
         state.phase0_complete = True
         state.save()
     else:
-        baselines = {
-            phase: json.loads((baselines_path / f"{phase}-baseline.json").read_text(encoding='utf-8'))
-            for phase in ["phase1", "phase2", "phase3"]
-        }
+        baselines = cached
+        state.phase0_complete = True
         log("Phase 0 baselines loaded from disk")
 
     if args.phase == 0:

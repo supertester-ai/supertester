@@ -1,4 +1,5 @@
 """通用阶段/模块迭代循环"""
+import json
 from pathlib import Path
 from typing import Callable
 import patcher
@@ -14,6 +15,33 @@ def read_skill_content(skill_dir: str, files: list) -> str:
         if path.exists():
             parts.append(f"=== {f} ===\n{path.read_text(encoding='utf-8')}")
     return "\n\n".join(parts)
+
+
+def _reuse_ai_output(iter_dir: Path) -> str | None:
+    """If ai-output.md exists and looks valid, reuse it (skip expensive gen)."""
+    p = iter_dir / "ai-output.md"
+    if not p.exists():
+        return None
+    text = p.read_text(encoding='utf-8')
+    if not text.strip() or text.startswith("Error:"):
+        return None
+    print(f"[phase_loop] Reusing saved ai-output.md from {iter_dir.name}", flush=True)
+    return text
+
+
+def _reuse_score(iter_dir: Path) -> dict | None:
+    """If score.json exists and parses, reuse it (skip expensive scoring)."""
+    p = iter_dir / "score.json"
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding='utf-8'))
+        if data.get("total_weighted_score") is None and not data.get("dimensions"):
+            return None
+        print(f"[phase_loop] Reusing saved score.json from {iter_dir.name}", flush=True)
+        return data
+    except json.JSONDecodeError:
+        return None
 
 
 def iterate(phase: str, module_name: str,
@@ -52,18 +80,22 @@ def iterate(phase: str, module_name: str,
         iter_dir = Path(iter_root) / f"iter-{iter_num}"
         iter_dir.mkdir(parents=True, exist_ok=True)
 
-        # ① 生成
-        ai_output = generator(iter_num)
-        (iter_dir / "ai-output.md").write_text(ai_output, encoding='utf-8')
+        # ① 生成 (复用已保存的 ai-output.md 若存在)
+        ai_output = _reuse_ai_output(iter_dir)
+        if ai_output is None:
+            ai_output = generator(iter_num)
+            (iter_dir / "ai-output.md").write_text(ai_output, encoding='utf-8')
 
-        # ② 打分
-        score = score_artifact(
-            phase=phase, module_name=module_name, iteration=iter_num,
-            ai_output=ai_output, baseline_a=baseline_a,
-            output_path=str(iter_dir / "score.json"),
-            convergence=convergence, prompt_dir=prompt_dir,
-            model=models["score"], timeout=timeout,
-        )
+        # ② 打分 (复用已保存的 score.json 若存在)
+        score = _reuse_score(iter_dir)
+        if score is None:
+            score = score_artifact(
+                phase=phase, module_name=module_name, iteration=iter_num,
+                ai_output=ai_output, baseline_a=baseline_a,
+                output_path=str(iter_dir / "score.json"),
+                convergence=convergence, prompt_dir=prompt_dir,
+                model=models["score"], timeout=timeout,
+            )
         last_score = score
         history.append({
             "iter": iter_num,

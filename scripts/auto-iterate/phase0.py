@@ -40,24 +40,38 @@ def merge_baselines(module_baselines: list[dict]) -> dict:
 
 def run_phase0(matched_modules: list[dict], output_dir: str,
                prompt_dir: str, model: str, timeout: int) -> dict:
-    """Phase 0 主流程: 按模块提取基准 → 合并 → 写入 baselines/"""
+    """Phase 0 主流程: 按模块提取基准 → 合并 → 写入 baselines/
+
+    Raises:
+        RuntimeError: 如果所有模块都提取失败（避免静默落盘空 baseline）
+    """
     baselines_dir = Path(output_dir) / "baselines"
     baselines_dir.mkdir(parents=True, exist_ok=True)
 
     module_baselines = []
-    for module in matched_modules:
-        if not module.get("ref_cases"):
-            continue  # 跳过没有参考用例的模块
+    failures = []
+    candidates = [m for m in matched_modules if m.get("ref_cases")]
+    print(f"[phase0] Extracting baselines for {len(candidates)} modules with reference cases", flush=True)
+
+    for module in candidates:
         safe_name = module["name"].replace('/', '_').replace(' ', '_')
         out = baselines_dir / f"module-{safe_name}.json"
         try:
+            print(f"[phase0] -> {module['name']}", flush=True)
             b = extract_baselines_for_module(
                 module, str(out),
                 prompt_dir=prompt_dir, model=model, timeout=timeout
             )
             module_baselines.append(b)
         except Exception as e:
-            print(f"[phase0] WARN: {module['name']} baseline extraction failed: {e}")
+            print(f"[phase0] WARN: {module['name']} baseline extraction failed: {e}", flush=True)
+            failures.append((module['name'], str(e)))
+
+    if not module_baselines:
+        raise RuntimeError(
+            f"Phase 0 failed: all {len(candidates)} module extractions failed. "
+            f"First failure: {failures[0] if failures else 'unknown'}"
+        )
 
     merged = merge_baselines(module_baselines)
 
@@ -69,4 +83,6 @@ def run_phase0(matched_modules: list[dict], output_dir: str,
             encoding='utf-8'
         )
 
+    print(f"[phase0] Done: {len(module_baselines)}/{len(candidates)} modules extracted "
+          f"({len(failures)} failures)", flush=True)
     return merged
