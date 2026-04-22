@@ -149,8 +149,11 @@ flowchart TD
 TestingAgent/
 |-- .claude-plugin/              # Claude Code 插件元数据
 |-- .opencode/                   # OpenCode 适配层与安装说明
+|-- .codex/                      # Codex 安装说明
+|-- .openclaw/                   # OpenClaw 技能目录
+|-- .continue/                   # Continue 技能目录
 |-- agents/                      # 独立审查 agent
-|-- docs/                        # 设计说明、分析报告
+|-- docs/                        # 设计说明、分析报告、安装指南
 |-- hooks/                       # SessionStart / Stop 等流程 hook
 |-- scripts/                     # 初始化与恢复脚本
 |-- skills/                      # Supertester 主流程技能
@@ -233,6 +236,8 @@ TestingAgent/
 
 ## 安装与接入
 
+详细安装指南请参阅 [安装文档](E:/workspace/aise/TestingAgent/docs/installation.md)。
+
 ### Claude Code
 
 仓库已包含 Claude 插件元数据：
@@ -253,6 +258,18 @@ OpenCode 适配入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/ai
   "plugin": ["supertester@git+https://gitcode.com/orion-c/supertester.git"]
 }
 ```
+
+### Codex
+
+Codex 通过原生技能发现机制工作，安装说明见 [`.codex/INSTALL.md`](E:/workspace/aise/TestingAgent/.codex/INSTALL.md)。
+
+### OpenClaw
+
+OpenClaw 支持工作区和全局技能安装，说明见 [`.openclaw/skills/supertester/SKILL.md`](E:/workspace/aise/TestingAgent/.openclaw/skills/supertester/SKILL.md)。
+
+### Continue
+
+Continue 支持项目级别和全局技能安装，说明见 [`.continue/INSTALL.md`](E:/workspace/aise/TestingAgent/.continue/INSTALL.md)。
 
 ### 作为规则资产直接复用
 
@@ -305,6 +322,7 @@ OpenCode 适配入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/ai
 
 ## 参考文档
 
+- [安装指南](E:/workspace/aise/TestingAgent/docs/installation.md)
 - [设计说明](E:/workspace/aise/TestingAgent/docs/design.md)
 - [差异分析](E:/workspace/aise/TestingAgent/docs/2026-04-08-comparison.md)
 - [反向优化分析](E:/workspace/aise/TestingAgent/docs/2026-04-09-supertester-optimization-analysis.md)

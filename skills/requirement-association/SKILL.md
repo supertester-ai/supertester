@@ -74,6 +74,8 @@ Also analyze two additional dependency families for every feature set:
    - refresh, retry, navigation away, session expiry, language/context switch, page rebuild, resume-after-failure
 6. **History and list interaction dependencies**
    - list ordering, pagination, lazy loading, empty state, feed refresh, history accumulation, cross-feature record visibility
+7. **PRD-external / operational boundary dependencies**
+   - configurable values whose source/owner is undefined, external service dependencies without SLA, compliance-driven features without regulatory detail, manual workflows not automated in product
 
 The purpose is not only to say "A depends on B", but to explain:
 
@@ -91,7 +93,7 @@ The purpose is not only to say "A depends on B", but to explain:
 ## Dependency Map
 | Module / Feature | Type | Depends On | Dependency Types |
 |------------------|------|------------|------------------|
-| [Module or Feature] | core/support | [dependency list] | functional/state/evidence/shared_resource/interruption_recovery/history_interaction |
+| [Module or Feature] | core/support | [dependency list] | functional/state/evidence/shared_resource/interruption_recovery/history_interaction/prd_external |
 
 ## Critical Paths
 1. [Module A] -> [Module B] -> [Module C]
@@ -100,6 +102,11 @@ The purpose is not only to say "A depends on B", but to explain:
 | Resource | Shared By | Risk |
 |----------|-----------|------|
 | [resource] | [modules] | high/medium/low |
+
+## PRD-External / Operational Boundary Items
+| Feature / Area | External Item | Type | Clarification Status |
+|----------------|---------------|------|----------------------|
+| [feature] | [item that PRD does not fully define] | ops_config / external_service / compliance / approval_flow | pending / clarified |
 
 ## Evidence Dependencies
 | Feature | Evidence Surface | Evidence Source | Risk |
@@ -121,6 +128,18 @@ The purpose is not only to say "A depends on B", but to explain:
 
 Infer requirements that are not explicitly written but are logically necessary.
 
+
+Additional P1 patterns for state machine and error propagation:
+
+- if an entity has 3+ named or implied states, enumerate the full state machine — are all forward, backward, timeout, and cancel transitions accounted for?
+- if a multi-step UI flow exists (chained dialogs, wizard, progressive form), can the user reach an illegal state by navigating backward, closing mid-flow, or deep-linking?
+- if identity or subscription tier changes, which downstream modules must re-evaluate their behavior — and is there a propagation mechanism or do they read stale state?
+- if an upstream service call fails, does the downstream module show an explicit error, silently degrade, show stale data, or crash?
+- if a shared numeric resource (quota, balance, trial count) can be modified by concurrent actors, is the decrement atomic or can it go negative / be double-spent?
+- if two asynchronous jobs write to the same record or queue, is ordering guaranteed or can results interleave?
+- if a background job and a user-initiated action race on the same entity, which one wins and is the loser's result visible anywhere (history, notification, log)?
+- if a global setting change (language, timezone, subscription tier) happens mid-operation, do in-flight operations use the old or new value?
+
 Categories:
 
 1. **Precondition implications**
@@ -132,6 +151,7 @@ Categories:
 7. **Shared-resource implications**
 8. **Interruption / recovery implications**
 9. **History / list consistency implications**
+10. **PRD-external / operational boundary implications**
 
 ### Generic P1 Implication Patterns
 
@@ -142,7 +162,30 @@ Look for these domain-agnostic patterns:
 - if records are created, do they appear in history/list surfaces with the right order and visibility?
 - if a feature writes state asynchronously, when is that state visible downstream?
 - if pagination or lazy loading exists, is ordering stable across pages or fetches?
+Additional P1 patterns for transient-UI and session-boundary interruptions:
+
+- if a transient UI element is visible (modal, overlay, toast, progress indicator), what happens on page refresh — does it reappear, reset, or disappear?
+- if the user switches a global setting (language, theme, accessibility mode) while a transient UI element is active, does the element update immediately or on next render?
+- if multiple browser tabs share the same session, and one tab changes auth or subscription state, do other tabs detect and reconcile on next interaction?
+- if the user closes the browser entirely during a multi-step flow (payment, onboarding, authorization), is there a resume entry point or does the flow restart?
+- if a background service (email delivery, webhook, async job) times out, is there a user-visible retry entry point and a clear status indication?
+- if a feature depends on an external service response to render UI (geo-IP, third-party auth, payment gateway), what is the degraded UI when that service is slow or unavailable?
+- if an error message or validation state is displayed, and the user navigates away then returns, is the error/validation state preserved, cleared, or re-evaluated?
+- if a confirmation/consent decision is pending (cookie consent, terms acceptance), does it survive navigation and page transitions until explicitly resolved?
+
 - if retries occur, does history duplicate, merge, or replace prior attempts?
+
+### PRD-External / Operational Boundary Patterns
+
+Look for these patterns that indicate items outside the PRD's scope but relevant to testing:
+
+- if a feature uses a **configurable value** (quota limits, pricing, thresholds, blacklists) but the PRD does not specify who maintains it or how it is updated → mark as `ops_config`
+- if a feature depends on an **external service** (payment gateway, email service, geo-IP provider, third-party auth) and the PRD does not define SLA, failover, or selection criteria → mark as `external_service`
+- if a feature is driven by **legal or compliance requirements** (GDPR, data retention, accessibility) and the PRD does not detail the specific regulatory rules → mark as `compliance`
+- if a feature involves a **manual approval or maintenance workflow** (blacklist curation, content moderation, refund processing) that is not automated in the product → mark as `approval_flow`
+- if a feature mentions a value that **changes with business strategy** (trial duration, tier pricing, promotional offers) without specifying change management → mark as `ops_config`
+
+For each identified item, record it in `implicit-requirements.md` with type `prd_external` and clarification status `pending`.
 
 ### Output: `implicit-requirements.md`
 
@@ -153,6 +196,7 @@ Look for these domain-agnostic patterns:
 |----|---------------|----------------------|------|----------|
 | IR-001 | F-001: "processing starts" | Refresh during processing must either preserve progress, resume safely, or clearly reset state. | interruption_recovery | high |
 | IR-002 | F-005: "history list shows results" | Newly generated results must appear in the correct list position with stable ordering rules. | history_interaction | high |
+| IR-003 | F-010: "blacklist domains" | Blacklist maintenance workflow (add/remove/approval) is not defined in PRD — mark as operational dependency. | prd_external | medium |
 ```
 
 ## Step 3: Generate Cross-Module Scenarios
@@ -254,3 +298,4 @@ Phase 2 is complete only when:
 - interruption/recovery associations are considered where applicable
 - history/list interactions are considered where applicable
 - cross-module scenarios cover more than happy paths
+- PRD-external / operational boundary items are identified and marked as pending clarification

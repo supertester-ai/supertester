@@ -21,6 +21,7 @@ class State:
 
     converged_modules: list = field(default_factory=list)
     unconverged_modules: list = field(default_factory=list)
+    completed_modules: list = field(default_factory=list)  # all evaluated (converged or not)
     current_module: str = ""
     current_iteration: int = 0
 

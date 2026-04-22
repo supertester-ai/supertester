@@ -7,6 +7,31 @@ from claude_runner import claude_call
 from dimensions import DIMENSIONS_BY_PHASE
 
 
+_ALL_DIMENSION_KEYS = set()
+for _dims in DIMENSIONS_BY_PHASE.values():
+    _ALL_DIMENSION_KEYS.update(_dims.keys())
+
+
+def normalize_score(result: dict) -> dict:
+    """If LLM returned dimensions at top level instead of under 'dimensions', wrap them."""
+    if "dimensions" in result:
+        return result
+    # Check if top-level keys look like dimension names
+    found = [k for k in result if k in _ALL_DIMENSION_KEYS and isinstance(result[k], dict)]
+    if not found:
+        return result
+    # Restructure: move dimension keys under 'dimensions'
+    new = {}
+    dims = {}
+    for k, v in result.items():
+        if k in _ALL_DIMENSION_KEYS and isinstance(v, dict):
+            dims[k] = v
+        else:
+            new[k] = v
+    new["dimensions"] = dims
+    return new
+
+
 def is_converged(score: dict, convergence_cfg: dict) -> bool:
     """检查评分是否满足收敛条件
 
@@ -97,5 +122,28 @@ def score_artifact(
         raise RuntimeError(
             f"Failed to parse score JSON for {phase}/{module_name}"
         )
+
+    # 结构校验：必须是含 dimensions 的 dict，否则视为评分失败
+    if not isinstance(result, dict):
+        raise RuntimeError(
+            f"Score JSON is not an object (got {type(result).__name__}) "
+            f"for {phase}/{module_name}. Raw output at {output_path}. "
+            f"Fix manually and save as {output_path}.manual, or delete the file to retry."
+        )
+
+    # Normalize flat structure (dimensions at top level) into nested format
+    result = normalize_score(result)
+
+    if "dimensions" not in result:
+        raise RuntimeError(
+            f"Score JSON missing 'dimensions' field for {phase}/{module_name}. "
+            f"Raw output at {output_path}."
+        )
+
+    # Re-save normalized version so reuse works next time
+    Path(output_path).write_text(
+        json.dumps(result, ensure_ascii=False, indent=2),
+        encoding='utf-8',
+    )
 
     return result

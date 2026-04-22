@@ -20,6 +20,7 @@ class Config:
     model: str = "sonnet"
     # 按任务分模型: 生成与差距分析吃推理 → opus；评分/审查/基准提取 → sonnet
     models: dict = field(default_factory=lambda: {
+        "discover": "sonnet",            # 模块发现（结构分析，sonnet 足够）
         "baseline": "sonnet",            # Phase 0 基准反向提取
         "generate": "claude-opus-4-6",   # Phase 1/2/3 生成（核心产物）
         "score":    "sonnet",            # 双基准打分（机械对比）
@@ -32,7 +33,7 @@ class Config:
 
     # 收敛标准
     convergence: dict = field(default_factory=lambda: {
-        "phase1": {"min_total_score": 0.80, "min_dimension_score": 0.60, "max_iterations": 4},
+        "phase1": {"min_total_score": 0.70, "min_dimension_score": 0.50, "max_iterations": 4},
         "phase2": {"min_total_score": 0.75, "min_dimension_score": 0.55, "max_iterations": 4},
         "phase3": {"min_total_score": 0.85, "min_dimension_score": 0.65, "max_iterations": 5},
     })

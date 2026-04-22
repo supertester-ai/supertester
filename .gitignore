@@ -12,6 +12,17 @@ Thumbs.db
 tmp/
 temp/
 
-/superpowers/
-/planning-with-files/
+# Supertester core
 .claude/
+.claude-plugin/
+.opencode/
+.omx/
+.codex/
+.openclaw/
+.continue/
+
+# Auto-iterate (evaluation tool, not part of core plugin)
+/scripts/auto-iterate/*
+
+# Verification workspace (per-run output, not part of repo)
+/verification/

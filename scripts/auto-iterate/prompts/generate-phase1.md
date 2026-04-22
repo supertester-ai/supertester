@@ -19,9 +19,10 @@
 严格遵循 skill 规则中定义的输出格式，生成一份完整的 parsed-requirements.md 内容。
 
 要求:
-- 提取所有 F-xxx 功能点
-- 完整标注 8 类测试资产 (内容/规则/集成/状态数据/约束/证据/多语言/Prompt)
-- 为每个功能点标注证据类型
-- 标注特性标签 (content_fidelity / process_feedback / interruption_recovery / visual_asset / contract_content / business_outside_prd)
+- 提取所有 F-xxx 功能点，按模块组织
+- 识别每个功能涉及的资产类别 (content/enum/state_data/contract/integration/i18n)
+- 提取业务规则和约束条件
+- 识别输入字段及其约束规格 (类型/范围/格式)
+- 对 PRD 中模糊或未明确的地方生成澄清项
 
 直接输出 Markdown 内容，不要添加 ```md 包裹。

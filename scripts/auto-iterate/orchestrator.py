@@ -6,7 +6,7 @@ from pathlib import Path
 
 from config import Config
 from state import load_or_init, State
-from splitter import split_prd, split_reference, match_modules
+from splitter import discover_modules
 from phase0 import run_phase0
 from phase_loop import iterate
 from generators import (
@@ -21,6 +21,19 @@ def log(msg: str):
 
 def _safe(name: str) -> str:
     return name.replace('/', '_').replace(' ', '_')
+
+
+def _upsert_unconverged_module(state: State, name: str, result: dict):
+    entry = {
+        "module": name,
+        "best_score": max((h.get("score", 0) for h in result["history"]), default=0),
+        "gap_dimensions": result.get("weak_dimensions", []),
+    }
+    state.unconverged_modules = [
+        item for item in state.unconverged_modules
+        if item.get("module") != name
+    ]
+    state.unconverged_modules.append(entry)
 
 
 def run_phase1(config: Config, state: State, baselines: dict):
@@ -131,15 +144,29 @@ def redo_phase2_final(config: Config, parsed_requirements: str) -> str:
 
 def run_phase3(config: Config, state: State, baselines: dict,
                matched_modules: list, parsed_requirements: str,
-               associations: str, only_module: str = None):
+               associations: str, only_modules: list = None,
+               force_modules: list = None):
     log(f"Phase 3 start: {len(matched_modules)} modules")
+    if force_modules is None:
+        force_modules = []
+
+    # Clear state for force-rerun modules
+    for fm in force_modules:
+        state.converged_modules = [m for m in state.converged_modules if m != fm]
+        state.completed_modules = [m for m in state.completed_modules if m != fm]
+        state.unconverged_modules = [u for u in state.unconverged_modules if u.get("module") != fm]
+    if force_modules:
+        state.save()
 
     for module in matched_modules:
         name = module["name"]
-        if only_module and name != only_module:
+        if only_modules and name not in only_modules:
             continue
-        if name in state.converged_modules:
+        if name in state.converged_modules and name not in force_modules:
             log(f"Module '{name}' already converged, skipping")
+            continue
+        if name in state.completed_modules and name not in force_modules:
+            log(f"Module '{name}' already evaluated (not converged), skipping (use --force-module to re-run)")
             continue
         if not module.get("ref_cases"):
             log(f"Module '{name}' has no reference cases, skipping")
@@ -157,7 +184,7 @@ def run_phase3(config: Config, state: State, baselines: dict,
             associations=associations,
             skill_dir=config.skill_dir,
             output_root=f"{config.output_dir}/iterations/phase3/{_safe(name)}",
-            prompt_dir=config.prompt_dir, model=config.model,
+            prompt_dir=config.prompt_dir, model=config.models["generate"],
             timeout=config.timeout,
         )
         result = iterate(
@@ -171,18 +198,21 @@ def run_phase3(config: Config, state: State, baselines: dict,
             skill_files=["skills/test-case-generation/SKILL.md",
                          "skills/test-case-generation/generator-reference.md"],
             max_revise_attempts=config.max_patch_revise_attempts,
-            prompt_dir=config.prompt_dir, model=config.model,
+            prompt_dir=config.prompt_dir, models=config.models,
             timeout=config.timeout,
         )
         state.history[name] = result["history"]
         if result["converged"]:
-            state.converged_modules.append(name)
+            state.unconverged_modules = [
+                item for item in state.unconverged_modules
+                if item.get("module") != name
+            ]
+            if name not in state.converged_modules:
+                state.converged_modules.append(name)
         else:
-            state.unconverged_modules.append({
-                "module": name,
-                "best_score": max((h.get("score", 0) for h in result["history"]), default=0),
-                "gap_dimensions": result.get("weak_dimensions", []),
-            })
+            _upsert_unconverged_module(state, name, result)
+        if name not in state.completed_modules:
+            state.completed_modules.append(name)
         state.save()
         log(f"Module '{name}' end: converged={result['converged']}")
 
@@ -191,12 +221,18 @@ def main():
     parser = argparse.ArgumentParser(description="Supertester Skill 自动迭代优化")
     parser.add_argument("--phase", type=int, choices=[0, 1, 2, 3],
                         help="只跑指定阶段 (0=baseline提取)")
-    parser.add_argument("--module", type=str,
-                        help="只跑指定模块 (仅对 Phase 3 有效)")
+    parser.add_argument("--module", type=str, action="append",
+                        help="只跑指定模块，可多次使用 (仅对 Phase 3 有效)")
+    parser.add_argument("--force-module", type=str, action="append",
+                        help="强制重跑指定模块（即使已评测过）")
+    parser.add_argument("--list-modules", action="store_true",
+                        help="列出所有模块及其状态然后退出")
     parser.add_argument("--status", action="store_true",
                         help="查看当前进度然后退出")
     parser.add_argument("--force-phase0", action="store_true",
                         help="忽略已有 baselines，强制重跑 Phase 0")
+    parser.add_argument("--force-discover", action="store_true",
+                        help="忽略已有 module-map 缓存，强制重新发现模块")
     args = parser.parse_args()
 
     config = Config()
@@ -209,15 +245,42 @@ def main():
         log(f"Phase 2 converged: {state.phase2_converged} ({state.phase2_iterations} iters)")
         log(f"Converged modules ({len(state.converged_modules)}): {state.converged_modules}")
         log(f"Unconverged modules: {[u['module'] for u in state.unconverged_modules]}")
+        evaluated_not_converged = [m for m in state.completed_modules
+                                   if m not in state.converged_modules]
+        log(f"Evaluated but not converged: {evaluated_not_converged}")
         return 0
 
     Path(config.output_dir).mkdir(parents=True, exist_ok=True)
 
-    prd_modules = split_prd(config.prd_path)
-    ref_groups = split_reference(config.reference_path)
-    matched = match_modules(prd_modules, ref_groups)
-    log(f"Split: {len(prd_modules)} PRD modules, {len(ref_groups)} ref groups, "
-        f"{sum(1 for m in matched if m.get('ref_cases'))} matched")
+    # AI-driven module discovery (cached unless --force-discover)
+    matched = discover_modules(
+        prd_path=config.prd_path,
+        ref_path=config.reference_path,
+        output_dir=config.output_dir,
+        prompt_dir=config.prompt_dir,
+        model=config.models.get("discover", config.model),
+        timeout=config.timeout,
+        force=args.force_discover,
+    )
+    log(f"Modules: {len(matched)} total, "
+        f"{sum(1 for m in matched if m.get('ref_cases'))} with ref cases")
+
+    if args.list_modules:
+        for m in matched:
+            name = m["name"]
+            has_ref = bool(m.get("ref_cases"))
+            if not has_ref:
+                status = "no-ref"
+            elif name in state.converged_modules:
+                status = "converged"
+            elif name in state.completed_modules:
+                best = next((u["best_score"] for u in state.unconverged_modules
+                             if u.get("module") == name), "?")
+                status = f"evaluated (best={best})"
+            else:
+                status = "pending"
+            log(f"  {name}: {status}")
+        return 0
 
     baselines_path = Path(config.output_dir) / "baselines"
 
@@ -281,8 +344,15 @@ def main():
 
     # Phase 3
     if args.phase is None or args.phase == 3:
+        force_mods = args.force_module or []
+        # --force-module implies --module selection
+        only_mods = args.module or []
+        if force_mods:
+            only_mods = list(set(only_mods + force_mods))
         run_phase3(config, state, baselines, matched,
-                   parsed_requirements, associations, only_module=args.module)
+                   parsed_requirements, associations,
+                   only_modules=only_mods or None,
+                   force_modules=force_mods)
 
     report_path = f"{config.output_dir}/final-report.md"
     generate_report(state, report_path)
