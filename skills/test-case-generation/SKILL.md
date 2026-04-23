@@ -1,5 +1,6 @@
 ---
 name: test-case-generation
+description: Use when generating functional test cases from confirmed requirements and association analysis - preserves variants, key evidence assets, and coverage dimensions before user confirmation
 ---
 
 # Skill 3: 功能测试用例生成
