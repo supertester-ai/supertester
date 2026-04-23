@@ -255,7 +255,7 @@ OpenCode 适配入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/ai
 
 ```json
 {
-  "plugin": ["supertester@git+https://gitcode.com/orion-c/supertester.git"]
+  "plugin": ["supertester@git+https://github.com/supertester-ai/supertester.git"]
 }
 ```
 

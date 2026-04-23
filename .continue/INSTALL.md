@@ -19,7 +19,7 @@ Continue supports both **project-level** (`<repo>/.continue/...`) and **global**
 In your project root:
 
 ```bash
-git clone https://github.com/your-org/supertester.git
+git clone https://github.com/supertester-ai/supertester.git
 cp -r supertester/.continue .continue
 ```
 
@@ -32,7 +32,7 @@ Restart Continue (or reload the IDE) so it picks up the new files.
 Copy the skill and prompt into your global Continue directory:
 
 ```bash
-git clone https://github.com/your-org/supertester.git
+git clone https://github.com/supertester-ai/supertester.git
 mkdir -p ~/.continue/skills ~/.continue/prompts
 cp -r supertester/.continue/skills/supertester ~/.continue/skills/
 cp supertester/.continue/prompts/supertester.prompt ~/.continue/prompts/
@@ -94,5 +94,5 @@ bash .continue/skills/supertester/scripts/check-complete.sh
 
 ## Getting Help
 
-- Report issues: https://github.com/your-org/supertester/issues
-- Main documentation: https://github.com/your-org/supertester
+- Report issues: https://github.com/supertester-ai/supertester/issues
+- Main documentation: https://github.com/supertester-ai/supertester

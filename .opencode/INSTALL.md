@@ -10,7 +10,7 @@ Add supertester to the `plugin` array in your `opencode.json` (global or project
 
 ```json
 {
-  "plugin": ["supertester@git+https://gitcode.com/orion-c/supertester.git"]
+  "plugin": ["supertester@git+https://github.com/supertester-ai/supertester.git"]
 }
 ```
 
@@ -55,7 +55,7 @@ To pin a specific version:
 
 ```json
 {
-  "plugin": ["supertester@git+https://gitcode.com/orion-c/supertester.git#v0.1.0"]
+  "plugin": ["supertester@git+https://github.com/supertester-ai/supertester.git#v0.1.0"]
 }
 ```
 

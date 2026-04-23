@@ -23,7 +23,7 @@ Copy the skill to your project:
 
 ```bash
 # Clone the repo
-git clone https://gitcode.com/orion-c/supertester.git
+git clone https://github.com/supertester-ai/supertester.git
 
 # Copy the OpenClaw skill to your workspace
 cp -r supertester/skills/supertester your-project/.openclaw/skills/
@@ -40,7 +40,7 @@ Install to your local OpenClaw skills directory:
 
 ```bash
 # Clone the repo
-git clone https://gitcode.com/orion-c/supertester.git
+git clone https://github.com/supertester-ai/supertester.git
 
 # Copy to global OpenClaw skills
 mkdir -p ~/.openclaw/skills
@@ -125,5 +125,5 @@ Configure the skill in `~/.openclaw/openclaw.json`:
 
 ## Getting Help
 
-- Report issues: https://gitcode.com/orion-c/supertester/issues
-- Main documentation: https://gitcode.com/orion-c/supertester
+- Report issues: https://github.com/supertester-ai/supertester/issues
+- Main documentation: https://github.com/supertester-ai/supertester

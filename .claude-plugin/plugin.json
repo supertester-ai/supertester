@@ -5,7 +5,8 @@
   "author": {
     "name": "supertester"
   },
-  "repository": "",
+  "homepage": "https://github.com/supertester-ai/supertester",
+  "repository": "https://github.com/supertester-ai/supertester.git",
   "license": "MIT",
   "keywords": [
     "testing",

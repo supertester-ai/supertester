@@ -10,7 +10,7 @@ Enable Supertester skills in Codex via native skill discovery. Just clone and sy
 
 1. **Clone the Supertester repository:**
    ```bash
-   git clone https://github.com/your-org/supertester.git ~/.codex/supertester
+git clone https://github.com/supertester-ai/supertester.git ~/.codex/supertester
    ```
 
 2. **Create the skills symlink:**
@@ -82,5 +82,5 @@ Junctions normally work without special permissions. If creation fails, try runn
 
 ## Getting Help
 
-- Report issues: https://github.com/your-org/supertester/issues
-- Main documentation: https://github.com/your-org/supertester
+- Report issues: https://github.com/supertester-ai/supertester/issues
+- Main documentation: https://github.com/supertester-ai/supertester

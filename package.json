@@ -3,5 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "AI-driven software testing workflow - from requirements to Playwright E2E scripts",
-  "main": ".opencode/plugins/supertester.js"
+  "main": ".opencode/plugins/supertester.js",
+  "homepage": "https://github.com/supertester-ai/supertester",
+  "repository": "https://github.com/supertester-ai/supertester.git"
 }
