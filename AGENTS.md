@@ -42,6 +42,49 @@ Supertester 是一个 Superpowers 风格的纯 Markdown 技能插件，覆盖完
 - **2-Action Rule**: 每 2 个操作后必须更新文件
 - **3-Strike Protocol**: 3 次失败后升级到用户
 
+## 统一交互模型
+
+当 Skill 需要向用户请求选择或确认时，必须先构造内部结构化模型，再根据宿主能力决定输出形式。
+
+### 内部模型
+
+```json
+{
+  "question": "完整问题",
+  "header": "短标题",
+  "multiple": false,
+  "custom": false,
+  "options": [
+    { "label": "Option A (Recommended)", "description": "Short explanation" },
+    { "label": "Option B", "description": "Short explanation" }
+  ]
+}
+```
+
+### 硬规则
+
+1. **优先原生** — 优先使用宿主原生结构化交互能力（question / request_user_input 等）
+2. **必须映射** — 如果宿主支持原生交互，禁止将 JSON 直接展示给用户，必须映射为原生交互组件
+3. **降级规则** — 如果宿主不支持原生交互，输出降级格式文本，禁止输出 JSON
+4. **禁止伪造** — 不要伪造按钮、假 HTML、假按钮文本、假 JSON 协议
+5. **短 label** — label 必须简短，适合作为按钮文案
+6. **推荐优先** — 推荐项必须放在第一个，并标注 (Recommended)
+7. **简化默认** —除非明确需要多重选择，否则 `multiple = false`，`custom = false`，只问一个问题
+8. **目标** — 支持时产出真实可点击交互；不支持时产出最清晰的文本选项
+
+### 降级格式
+
+```
+Question: <question>
+1. <label>
+   <description>
+
+2. <label>
+   <description>
+
+Reply with the option number only.
+```
+
 ## Agent
 
 - `test-reviewer` — 独立审查 agent，在 Phase 2/3/5 审查产出物质量
