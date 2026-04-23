@@ -18,33 +18,53 @@ When installed as a full plugin, Codex loads:
 
 ## Installation
 
-### Preferred: install as a Codex plugin
+### Preferred: install from the Codex marketplace source
 
-Use the Codex Plugins UI and install this repository as a plugin. The Codex manifest is:
+Register the Supertester marketplace source once:
+
+```text
+/plugin marketplace add https://github.com/supertester-ai/supertester
+```
+
+Install the plugin:
+
+```text
+/plugin install supertester@supertester
+```
+
+Reload plugins so the new plugin becomes active:
+
+```text
+/reload-plugins
+```
+
+The Codex plugin manifest used by this marketplace is:
 
 ```text
 .codex-plugin/plugin.json
 ```
 
-If your Codex build supports installing from a Git repository, use:
+The Codex marketplace manifest is:
 
 ```text
-https://github.com/supertester-ai/supertester.git
+.agents/plugins/marketplace.json
 ```
 
-If your Codex build supports installing from a local path, first clone the repository:
+### Local development install
+
+If you want to test a local clone first:
 
 ```bash
 git clone https://github.com/supertester-ai/supertester.git ~/plugins/supertester
 ```
-
-Then install the local plugin directory through the Codex Plugins UI.
 
 **Windows (PowerShell)**
 
 ```powershell
 git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\plugins\supertester"
 ```
+
+Then point Codex plugin installation at that local clone if your Codex build supports local plugin sources.
 
 ### Legacy fallback: skills-only mode
 
@@ -67,7 +87,7 @@ If installed from a local clone:
 cd ~/plugins/supertester && git pull
 ```
 
-Then refresh or reinstall the plugin in Codex.
+Then reload or reinstall the plugin in Codex.
 
 ## Uninstalling
 

@@ -46,25 +46,24 @@ Fetch and follow instructions from https://raw.githubusercontent.com/supertester
 
 Codex 下必须以**完整插件**方式安装，不能只挂 `skills/`。否则 `test-reviewer` 和 hook 自动化行为都不会生效。
 
-优先方式是通过 Codex 的 Plugins UI 安装本仓库，插件清单位于：
+推荐安装方式：
 
 ```text
-.codex-plugin/plugin.json
+/plugin marketplace add https://github.com/supertester-ai/supertester
+/plugin install supertester@supertester
+/reload-plugins
 ```
 
-如果你的 Codex 版本支持从 Git 仓库安装，使用：
+本仓库现在同时提供：
 
-```text
-https://github.com/supertester-ai/supertester.git
-```
+- Codex 插件清单：`.codex-plugin/plugin.json`
+- Codex marketplace 清单：`.agents/plugins/marketplace.json`
 
-如果你的 Codex 版本支持从本地路径安装，先克隆仓库：
+如果你要做本地开发，也可以先克隆仓库：
 
 ```bash
 git clone https://github.com/supertester-ai/supertester.git ~/plugins/supertester
 ```
-
-然后在 Codex Plugins UI 中安装本地插件目录。
 
 Windows PowerShell 克隆示例：
 
