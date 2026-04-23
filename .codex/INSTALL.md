@@ -18,36 +18,18 @@ When installed as a full plugin, Codex loads:
 
 ## Installation
 
-### Preferred: install from the Codex marketplace source
+### Preferred: install this repository as a Codex plugin
 
-Register the Supertester marketplace source once:
-
-```text
-/plugin marketplace add https://github.com/supertester-ai/supertester
-```
-
-Install the plugin:
+If your Codex build supports installing from a Git repository, use:
 
 ```text
-/plugin install supertester@supertester
+https://github.com/supertester-ai/supertester.git
 ```
 
-Reload plugins so the new plugin becomes active:
-
-```text
-/reload-plugins
-```
-
-The Codex plugin manifest used by this marketplace is:
+The Codex plugin manifest is:
 
 ```text
 .codex-plugin/plugin.json
-```
-
-The Codex marketplace manifest is:
-
-```text
-.agents/plugins/marketplace.json
 ```
 
 ### Local development install

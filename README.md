@@ -21,7 +21,7 @@ Supertester 提供了 Claude Code 可用的插件市场元数据。
 然后从该 marketplace 安装插件：
 
 ```bash
-/plugin install supertester@supertester
+/plugin install supertester-ai@supertester
 ```
 
 ### Claude Code (Direct Git Install)
@@ -49,15 +49,18 @@ Codex 下必须以**完整插件**方式安装，不能只挂 `skills/`。否则
 推荐安装方式：
 
 ```text
-/plugin marketplace add https://github.com/supertester-ai/supertester
-/plugin install supertester@supertester
-/reload-plugins
+直接把这个仓库作为 Codex 插件安装
 ```
 
-本仓库现在同时提供：
+本仓库现在提供：
 
 - Codex 插件清单：`.codex-plugin/plugin.json`
-- Codex marketplace 清单：`.agents/plugins/marketplace.json`
+
+如果你的 Codex 版本支持从 Git 仓库安装，使用：
+
+```text
+https://github.com/supertester-ai/supertester.git
+```
 
 如果你要做本地开发，也可以先克隆仓库：
 
@@ -70,6 +73,8 @@ Windows PowerShell 克隆示例：
 ```powershell
 git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\plugins\supertester"
 ```
+
+然后在 Codex 插件安装入口中选择这个仓库地址或本地插件目录。
 
 详细说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
 
