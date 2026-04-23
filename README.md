@@ -46,35 +46,67 @@ Fetch and follow instructions from https://raw.githubusercontent.com/supertester
 
 Codex 下必须以**完整插件**方式安装，不能只挂 `skills/`。否则 `test-reviewer` 和 hook 自动化行为都不会生效。
 
-推荐安装方式：
+当前推荐的 Codex 安装方式是按官方 **local marketplace** 模型安装，而不是把这个仓库直接当成 marketplace 根目录。
 
-```text
-直接把这个仓库作为 Codex 插件安装
-```
-
-本仓库现在提供：
+这个仓库本身是**插件仓库**，插件入口在：
 
 - Codex 插件清单：`.codex-plugin/plugin.json`
 
-如果你的 Codex 版本支持从 Git 仓库安装，使用：
+对 Codex 来说，更稳妥的本地安装方式是使用 **personal marketplace**：
 
-```text
-https://github.com/supertester-ai/supertester.git
-```
-
-如果你要做本地开发，也可以先克隆仓库：
+1. 先把仓库放到本地插件目录，例如：
 
 ```bash
-git clone https://github.com/supertester-ai/supertester.git ~/plugins/supertester
+git clone https://github.com/supertester-ai/supertester.git ~/.codex/plugins/supertester
 ```
 
-Windows PowerShell 克隆示例：
+Windows PowerShell 示例：
 
 ```powershell
-git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\plugins\supertester"
+git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\.codex\plugins\supertester"
 ```
 
-然后在 Codex 插件安装入口中选择这个仓库地址或本地插件目录。
+2. 创建或更新个人 marketplace 文件 `~/.agents/plugins/marketplace.json`，让它指向这个插件目录：
+
+```json
+{
+  "name": "supertester",
+  "interface": {
+    "displayName": "Supertester"
+  },
+  "plugins": [
+    {
+      "name": "supertester",
+      "source": {
+        "source": "local",
+        "path": "./.codex/plugins/supertester"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    }
+  ]
+}
+```
+
+3. 重启 Codex，打开 `/plugins`，在 `Supertester` marketplace 下安装并启用 `supertester`。
+
+Codex 安装后会把运行副本物化到：
+
+```text
+~/.codex/plugins/cache/supertester/supertester/local/
+```
+
+插件启用状态会记录到：
+
+```toml
+[plugins.'supertester@supertester']
+path = '~/.codex/plugins/cache/supertester/supertester/local'
+```
+
+如果你修改了插件源码，需要同步更新 marketplace 指向的本地插件目录，然后重启 Codex 让它重新读取。
 
 详细说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
 
