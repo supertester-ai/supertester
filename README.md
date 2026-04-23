@@ -44,11 +44,49 @@ Fetch and follow instructions from https://raw.githubusercontent.com/supertester
 
 ### Codex
 
-Codex 的安装方式见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
+1. 克隆仓库：
+
+```bash
+git clone https://github.com/supertester-ai/supertester.git ~/.codex/supertester
+```
+
+2. 创建技能链接：
+
+```bash
+mkdir -p ~/.agents/skills
+ln -s ~/.codex/supertester/skills ~/.agents/skills/supertester
+```
+
+Windows PowerShell：
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
+cmd /c mklink /J "$env:USERPROFILE\.agents\skills\supertester" "$env:USERPROFILE\.codex\supertester\skills"
+```
+
+详细说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
 
 ### OpenClaw
 
-OpenClaw 的安装方式见 [`.openclaw/skills/supertester/SKILL.md`](.openclaw/skills/supertester/SKILL.md)。
+OpenClaw 支持工作区安装和全局安装。
+
+工作区安装：
+
+```bash
+mkdir -p .openclaw/skills
+git clone https://github.com/supertester-ai/supertester.git /tmp/supertester
+cp -R /tmp/supertester/skills .openclaw/skills/supertester
+```
+
+全局安装：
+
+```bash
+mkdir -p ~/.openclaw/skills
+git clone https://github.com/supertester-ai/supertester.git /tmp/supertester
+cp -R /tmp/supertester/skills ~/.openclaw/skills/supertester
+```
+
+详细说明见 [`.openclaw/skills/supertester/SKILL.md`](.openclaw/skills/supertester/SKILL.md)。
 
 ### Continue
 
