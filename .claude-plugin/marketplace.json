@@ -1,6 +1,6 @@
 {
-  "name": "supertester-dev",
-  "description": "Development marketplace for Supertester testing workflow plugin",
+  "name": "supertester",
+  "description": "Marketplace for the Supertester testing workflow plugin",
   "owner": {
     "name": "supertester"
   },

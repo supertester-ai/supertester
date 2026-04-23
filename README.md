@@ -4,6 +4,56 @@
 
 当前仓库的核心不是传统 `src/` 应用，而是一套由 `skills/`、`hooks/`、`templates/`、`agents/` 和 `.opencode/` 组成的测试能力编排资产。
 
+## Installation
+
+**Note:** 安装方式因平台而异。
+
+### Claude Code (Supertester Marketplace)
+
+Supertester 提供了 Claude Code 可用的插件市场元数据。
+
+在 Claude Code 中，先注册 marketplace：
+
+```bash
+/plugin marketplace add supertester-ai/supertester
+```
+
+然后从该 marketplace 安装插件：
+
+```bash
+/plugin install supertester@supertester
+```
+
+### Claude Code (Direct Git Install)
+
+如果你不走 marketplace，也可以直接从 git 仓库安装：
+
+```bash
+/plugin add https://github.com/supertester-ai/supertester.git
+```
+
+### OpenCode
+
+告诉 OpenCode：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/supertester-ai/supertester/refs/heads/main/.opencode/INSTALL.md
+```
+
+详细说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+
+### Codex
+
+Codex 的安装方式见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
+
+### OpenClaw
+
+OpenClaw 的安装方式见 [`.openclaw/skills/supertester/SKILL.md`](.openclaw/skills/supertester/SKILL.md)。
+
+### Continue
+
+Continue 的安装方式见 [`.continue/INSTALL.md`](.continue/INSTALL.md)。
+
 ## 它解决什么问题
 
 Supertester 适合这类场景：
