@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./hooks/run-hook\" session-start",
+            "statusMessage": "Loading Supertester session context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./hooks/run-hook\" user-prompt-submit",
+            "statusMessage": "Applying Supertester workflow context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./hooks/run-hook\" pre-tool-use",
+            "statusMessage": "Running Supertester pre-tool guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./hooks/run-hook\" post-tool-use",
+            "statusMessage": "Running Supertester post-tool reminder"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./hooks/run-hook\" stop",
+            "statusMessage": "Running Supertester completion check"
+          }
+        ]
+      }
+    ]
+  }
+}

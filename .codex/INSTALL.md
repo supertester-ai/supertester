@@ -1,84 +1,93 @@
 # Installing Supertester for Codex
 
-Enable Supertester skills in Codex via native skill discovery. Just clone and symlink.
+Install Supertester as a full Codex plugin. The old `skills`-only symlink mode is not sufficient because it does not load the bundled `test-reviewer` agent or the hook-based workflow guards.
+
+## What the Codex plugin loads
+
+When installed as a full plugin, Codex loads:
+
+- `skills/` for the Supertester workflow skills
+- `agents/test-reviewer.md` for independent review
+- root `hooks.json` for SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, and Stop checks
 
 ## Prerequisites
 
 - Git
+- Codex with plugin support enabled
+- Bash available in PATH
 
 ## Installation
 
-1. **Clone the Supertester repository:**
-   ```bash
-git clone https://github.com/supertester-ai/supertester.git ~/.codex/supertester
-   ```
+### Preferred: install as a Codex plugin
 
-2. **Create the skills symlink:**
-   ```bash
-   mkdir -p ~/.agents/skills
-   ln -s ~/.codex/supertester/skills ~/.agents/skills/supertester
-   ```
+Use the Codex Plugins UI and install this repository as a plugin. The Codex manifest is:
 
-   **Windows (PowerShell):**
-   ```powershell
-   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
-   cmd /c mklink /J "$env:USERPROFILE\.agents\skills\supertester" "$env:USERPROFILE\.codex\supertester\skills"
-   ```
+```text
+.codex-plugin/plugin.json
+```
 
-3. **Restart Codex** (quit and relaunch the CLI) to discover the skills.
+If your Codex build supports installing from a Git repository, use:
+
+```text
+https://github.com/supertester-ai/supertester.git
+```
+
+If your Codex build supports installing from a local path, first clone the repository:
+
+```bash
+git clone https://github.com/supertester-ai/supertester.git ~/plugins/supertester
+```
+
+Then install the local plugin directory through the Codex Plugins UI.
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\plugins\supertester"
+```
+
+### Legacy fallback: skills-only mode
+
+The old skills-only install can still expose the Markdown skills, but it is **not** a complete Supertester installation in Codex because it does not provide native plugin hooks or the bundled reviewer agent.
 
 ## Verify
 
-```bash
-ls -la ~/.agents/skills/supertester
-```
+After installation, confirm the following behavior in Codex:
 
-You should see a symlink (or junction on Windows) pointing to your Supertester skills directory.
+1. On session start, Supertester context is injected automatically.
+2. `using-supertester` is available without manual skill symlink setup.
+3. Phase 2/3/5 flows can call the bundled `test-reviewer`.
+4. Stop checks warn when `.supertester/test_plan.md` still has incomplete phases.
 
 ## Updating
 
+If installed from a local clone:
+
 ```bash
-cd ~/.codex/supertester && git pull
+cd ~/plugins/supertester && git pull
 ```
 
-Skills update instantly through the symlink.
+Then refresh or reinstall the plugin in Codex.
 
 ## Uninstalling
 
-```bash
-rm ~/.agents/skills/supertester
-```
-
-Optionally delete the clone: `rm -rf ~/.codex/supertester`.
-
-**Windows (PowerShell):**
-```powershell
-Remove-Item "$env:USERPROFILE\.agents\skills\supertester"
-```
-
-## Available Skills
-
-| Skill | Purpose |
-|-------|---------|
-| using-supertester | Entry point + workflow routing |
-| requirement-analysis | Parse requirements + clarify ambiguities |
-| requirement-association | Module dependencies + cross-module scenarios |
-| test-case-generation | Generate functional test cases |
-| automation-analysis | Classify automation feasibility |
-| automation-scripting | Generate Playwright E2E scripts |
-| test-reporting | Generate test reports |
+Remove the plugin from the Codex Plugins UI. If you used a local clone, optionally delete it afterward.
 
 ## Troubleshooting
 
-### Skills not showing up
+### The plugin loads skills but not the full workflow
 
-1. Verify the symlink: `ls -la ~/.agents/skills/supertester`
-2. Check skills exist: `ls ~/.codex/supertester/skills`
-3. Restart Codex — skills are discovered at startup
+You likely installed Supertester as skills only. Reinstall it as a full Codex plugin so `agents/` and `hooks.json` are loaded as well.
 
-### Windows junction issues
+### Hooks do not run
 
-Junctions normally work without special permissions. If creation fails, try running PowerShell as administrator.
+1. Confirm the plugin root includes `hooks.json`
+2. Confirm Bash is available in PATH
+3. Restart Codex after plugin installation or update
+
+### `test-reviewer` cannot be found
+
+This indicates Codex loaded the skills without the plugin's `agents/` directory. Reinstall as a full plugin.
 
 ## Getting Help
 

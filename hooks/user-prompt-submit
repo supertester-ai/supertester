@@ -26,11 +26,11 @@ if [ -f ".supertester/test_plan.md" ]; then
 
     iron_law=""
     case "$phase_num" in
-        1) iron_law="Iron Law: 不理解需求，就不准生成任何测试。" ;;
-        2) iron_law="Iron Law: 不分析关联，就不准生成用例。" ;;
-        3) iron_law="Iron Law: 按需求特征选择生成器，不盲目全部调用。" ;;
-        4) iron_law="Iron Law: 未经用户确认的用例不准分析自动化可行性。" ;;
-        5) iron_law="Iron Law: 只为已确认且标记为 automatable/partial 的用例生成脚本。" ;;
+        1) iron_law="Iron Law: 涓嶇悊瑙ｉ渶姹傦紝灏变笉鍑嗙敓鎴愪换浣曟祴璇曘€? ;;
+        2) iron_law="Iron Law: 涓嶅垎鏋愬叧鑱旓紝灏变笉鍑嗙敓鎴愮敤渚嬨€? ;;
+        3) iron_law="Iron Law: 鎸夐渶姹傜壒寰侀€夋嫨鐢熸垚鍣紝涓嶇洸鐩叏閮ㄨ皟鐢ㄣ€? ;;
+        4) iron_law="Iron Law: 鏈粡鐢ㄦ埛纭鐨勭敤渚嬩笉鍑嗗垎鏋愯嚜鍔ㄥ寲鍙鎬с€? ;;
+        5) iron_law="Iron Law: 鍙负宸茬‘璁や笖鏍囪涓?automatable/partial 鐨勭敤渚嬬敓鎴愯剼鏈€? ;;
         6) iron_law="" ;;
         *) iron_law="" ;;
     esac

@@ -1,0 +1,45 @@
+{
+  "name": "supertester",
+  "version": "0.1.0",
+  "description": "AI-driven software testing workflow plugin: from requirements to Playwright E2E scripts",
+  "author": {
+    "name": "supertester",
+    "url": "https://github.com/supertester-ai"
+  },
+  "homepage": "https://github.com/supertester-ai/supertester",
+  "repository": "https://github.com/supertester-ai/supertester.git",
+  "license": "MIT",
+  "keywords": [
+    "testing",
+    "playwright",
+    "e2e",
+    "test-generation",
+    "requirements-analysis",
+    "test-automation",
+    "quality-assurance"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Supertester",
+    "shortDescription": "Structured testing workflows for requirements, cases, review, and Playwright output",
+    "longDescription": "Use Supertester to turn requirements into reviewable test assets with staged analysis, independent quality review, automation feasibility analysis, and Playwright scripting.",
+    "developerName": "supertester",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/supertester-ai/supertester",
+    "privacyPolicyURL": "https://github.com/supertester-ai/supertester",
+    "termsOfServiceURL": "https://github.com/supertester-ai/supertester",
+    "defaultPrompt": [
+      "Analyze this PRD and generate test cases.",
+      "Use Supertester to review and expand test coverage for this feature."
+    ],
+    "brandColor": "#0F766E",
+    "composerIcon": "./assets/supertester.svg",
+    "logo": "./assets/supertester.svg",
+    "screenshots": []
+  }
+}

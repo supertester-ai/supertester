@@ -44,24 +44,32 @@ Fetch and follow instructions from https://raw.githubusercontent.com/supertester
 
 ### Codex
 
-1. 克隆仓库：
+Codex 下必须以**完整插件**方式安装，不能只挂 `skills/`。否则 `test-reviewer` 和 hook 自动化行为都不会生效。
 
-```bash
-git clone https://github.com/supertester-ai/supertester.git ~/.codex/supertester
+优先方式是通过 Codex 的 Plugins UI 安装本仓库，插件清单位于：
+
+```text
+.codex-plugin/plugin.json
 ```
 
-2. 创建技能链接：
+如果你的 Codex 版本支持从 Git 仓库安装，使用：
 
-```bash
-mkdir -p ~/.agents/skills
-ln -s ~/.codex/supertester/skills ~/.agents/skills/supertester
+```text
+https://github.com/supertester-ai/supertester.git
 ```
 
-Windows PowerShell：
+如果你的 Codex 版本支持从本地路径安装，先克隆仓库：
+
+```bash
+git clone https://github.com/supertester-ai/supertester.git ~/plugins/supertester
+```
+
+然后在 Codex Plugins UI 中安装本地插件目录。
+
+Windows PowerShell 克隆示例：
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
-cmd /c mklink /J "$env:USERPROFILE\.agents\skills\supertester" "$env:USERPROFILE\.codex\supertester\skills"
+git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\plugins\supertester"
 ```
 
 详细说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
