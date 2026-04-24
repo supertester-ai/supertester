@@ -35,7 +35,7 @@ fi
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$context"
 elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
-  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "Stop",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+  printf '{\n  "systemMessage": "%s"\n}\n' "$context"
 else
   printf '{\n  "additionalContext": "%s"\n}\n' "$context"
 fi
