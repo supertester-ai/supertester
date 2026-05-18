@@ -38,6 +38,7 @@ Supertester 是一个 Superpowers 风格的纯 Markdown 技能插件，覆盖完
 
 - **Iron Law**: 每个 Skill 的绝对禁令
 - **Hard Gate**: 阻塞进入下一阶段的硬门禁
+- **Max Phase**: 在 test_plan.md 中设定工作流终止阶段。达到后自动终止，不进入后续 Phase。留空或不填 = 执行全部 6 个 Phase
 - **Red Flags**: Agent 自我说服的防御表
 - **2-Action Rule**: 每 2 个操作后必须更新文件
 - **3-Strike Protocol**: 3 次失败后升级到用户

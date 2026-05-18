@@ -11,6 +11,12 @@
 ## Current Phase
 Phase 1
 
+## Max Phase
+<!-- 工作流终止阶段。设定后，达到该阶段即自动终止，不进入后续 Phase。
+     例: Phase 3 表示完成测试用例生成后停止，不进入自动化分析和脚本生成。
+     留空或不填表示执行全部 6 个 Phase。 -->
+Phase 3
+
 ## Phases
 
 ### Phase 1: 需求解析与澄清

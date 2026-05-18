@@ -91,10 +91,11 @@
 | Question | Answer |
 |----------|--------|
 | 我在哪里？ | test_plan.md 中的当前阶段 |
-| 我要去哪里？ | 剩余阶段 |
+| 我要去哪里？ | 剩余阶段（不超过 Max Phase） |
 | 目标是什么？ | test_plan.md 中的目标声明 |
 | 我发现了什么？ | findings.md |
 | 我做了什么？ | 见上方日志 |
+| Max Phase 限制？ | test_plan.md 中的 Max Phase 值 |
 
 ---
 *每完成一个阶段或遇到错误后更新此文件*

@@ -287,6 +287,15 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 
 用户确认后更新 test_plan.md Phase 3 -> complete。
 
+确认完成后，检查 test_plan.md 的 Max Phase 字段：
+- 如果 Max Phase = Phase 3，向用户输出终止消息：
+  ```
+  功能测试用例已确认，Phase 3 完成。
+  当前 Max Phase = Phase 3，工作流在此终止。
+  如需继续自动化分析、脚本生成或测试报告，请将 test_plan.md 中的 Max Phase 更新为 Phase 4/5/6。
+  ```
+- 如果 Max Phase > 3 或未设置，正常提示用户可进入 Phase 4。
+
 ## 输出格式 (functional-cases.md)
 
 ```markdown

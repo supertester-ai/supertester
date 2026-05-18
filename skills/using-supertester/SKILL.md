@@ -39,12 +39,14 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 1. 创建 `.supertester/` 及子目录 (requirements/, test-cases/, scripts/, reviews/, reports/)
 2. 从 templates/ 复制 test_plan.md, findings.md, progress.md
 3. 在 test_plan.md 的 Goal 中填写用户的测试目标
-4. 更新 progress.md 的日期
+4. 检查 test_plan.md 的 Max Phase 字段：如果用户明确只需要到某个阶段（如 Phase 3），将 Max Phase 设为对应值；否则保持默认值
+5. 更新 progress.md 的日期
 
 **已存在：**
-1. 读取 test_plan.md 确定当前阶段
-2. 提示用户："检测到未完成的测试任务，当前在 Phase X。继续？"
-3. 用户确认后从断点恢复
+1. 读取 test_plan.md 确定当前阶段和 Max Phase
+2. 如果当前阶段已达到 Max Phase，提示用户："检测到已完成的工作流（Max Phase = Phase X），所有阶段已完成。如需继续后续阶段，请更新 test_plan.md 中的 Max Phase。"
+3. 如果未达到 Max Phase，提示用户："检测到未完成的测试任务，当前在 Phase X / Max Phase Y。继续？"
+4. 用户确认后从断点恢复
 
 ## 意图路由
 
@@ -59,6 +61,7 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 | 生成报告 | test-reporting | "生成测试报告" |
 | 基于历史测试资产补充/修订/查缺补漏 | 先 requirement-analysis / requirement-association，再进入补充、修订和缺口补全 | "基于历史用例补充当前功能测试" |
 | 查询/问答 | 直接回答 | "checkout 模块需要哪些测试？" |
+| 请求超出 Max Phase 范围 | 阻止并提示用户更新 Max Phase | "生成 Playwright 脚本"（但 Max Phase = 3） |
 
 如果用户提供了历史测试资产（历史用例、历史 case、测试清单、缺陷单、回归包），不要把它们只当参考材料。应优先把它们视为“业务历史逻辑与历史测试资产”，**在 Phase 1 就消化吸收**，用于补充、修订和查缺补漏，而不是把它们当成需要单独对比的一组产物：
 
@@ -93,6 +96,35 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 - **Phase 4-5**: 只自动化适合自动化的部分，不强行把所有测试资产都转成脚本
 - **Phase 6**: 报告不仅总结数量，还要说明覆盖维度、缺口和保留的人工测试部分
 
+## 流程终止控制 (Max Phase)
+
+`test_plan.md` 中的 **Max Phase** 字段控制工作流的终止阶段。达到该阶段后，`using-supertester` 将阻止进入后续 Phase 的请求，直到用户更新 Max Phase。
+
+### 工作流终止行为
+
+| Max Phase | 终止点 | 被阻止的技能 |
+|-----------|--------|-------------|
+| Phase 1 | 需求解析完成后 | requirement-association, test-case-generation, automation-analysis, automation-scripting, test-reporting |
+| Phase 2 | 关联分析完成后 | test-case-generation, automation-analysis, automation-scripting, test-reporting |
+| Phase 3 | 用例生成完成后 | automation-analysis, automation-scripting, test-reporting |
+| Phase 4 | 自动化分析完成后 | automation-scripting, test-reporting |
+| Phase 5 | 脚本生成完成后 | test-reporting |
+| Phase 6 (或不填) | 全部完成 | 无阻止 |
+
+### Max Phase 检查规则
+
+1. **每次意图路由前检查**: 将用户意图映射到的目标 Phase 与 Max Phase 比较
+2. **超出范围处理**: 如果目标 Phase > Max Phase，回复：
+   ```
+   当前 Max Phase = Phase X，该操作需要 Phase Y。
+   如需继续，请先在 test_plan.md 中将 Max Phase 更新为 Phase Y。
+   ```
+3. **达到 Max Phase 后**: 对应 Phase 完成后的用户确认消息末尾追加：
+   ```
+   已到达 Max Phase (Phase X)。工作流在此终止。
+   如需继续后续阶段，请更新 test_plan.md 中的 Max Phase 并重新启动会话。
+   ```
+
 ## 文件持久化规则
 
 ### 3 核心文件
@@ -123,6 +155,7 @@ ATTEMPT 3: 更广泛地反思
 | "先做再说" | 先理解需求。Iron Law 不可违反。 |
 | "上下文够用不需要写文件" | 上下文会丢失。文件不会。 |
 | "用户催得急" | 返工成本远高于流程成本。 |
+| "超出 Max Phase 的用户请求可以直接执行" | Max Phase 是用户显式设定的终止边界，不得绕过。必须提示用户更新 Max Phase 后再继续。 |
 | "历史测试用例只是参考" | 历史测试资产往往包含高价值规则、内容、状态断言和经验边界，忽略它们会让新生成结果失真 |
 | "先把功能用例生成出来再查缺补漏" | 如果不在早期识别测试资产和证据类型，后期补洞成本更高 |
 
