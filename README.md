@@ -21,7 +21,7 @@ Supertester 提供了 Claude Code 可用的插件市场元数据。
 然后从该 marketplace 安装插件：
 
 ```bash
-/plugin install supertester-ai@supertester
+/plugin install supertester@supertester
 ```
 
 ### Claude Code (Direct Git Install)
