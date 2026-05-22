@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook\" session-start",
             "timeout": 10000,
             "async": false
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" user-prompt-submit",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook\" user-prompt-submit",
             "timeout": 5000,
             "async": false
           }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" pre-tool-use",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook\" pre-tool-use",
             "timeout": 5000,
             "async": false
           }
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" post-tool-use",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook\" post-tool-use",
             "timeout": 5000,
             "async": false
           }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" stop",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook\" stop",
             "timeout": 10000,
             "async": false
           }
