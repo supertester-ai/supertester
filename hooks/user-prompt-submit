@@ -26,11 +26,11 @@ if [ -f ".supertester/test_plan.md" ]; then
 
     iron_law=""
     case "$phase_num" in
-        1) iron_law="Iron Law: 涓嶇悊瑙ｉ渶姹傦紝灏变笉鍑嗙敓鎴愪换浣曟祴璇曘€? ;;
-        2) iron_law="Iron Law: 涓嶅垎鏋愬叧鑱旓紝灏变笉鍑嗙敓鎴愮敤渚嬨€? ;;
-        3) iron_law="Iron Law: 鎸夐渶姹傜壒寰侀€夋嫨鐢熸垚鍣紝涓嶇洸鐩叏閮ㄨ皟鐢ㄣ€? ;;
-        4) iron_law="Iron Law: 鏈粡鐢ㄦ埛纭鐨勭敤渚嬩笉鍑嗗垎鏋愯嚜鍔ㄥ寲鍙鎬с€? ;;
-        5) iron_law="Iron Law: 鍙负宸茬‘璁や笖鏍囪涓?automatable/partial 鐨勭敤渚嬬敓鎴愯剼鏈€? ;;
+        1) iron_law="Iron Law: Do not generate any tests without understanding the requirements." ;;
+        2) iron_law="Iron Law: Do not generate test cases without analyzing module associations." ;;
+        3) iron_law="Iron Law: Select generators by requirement characteristics; do not blindly invoke all." ;;
+        4) iron_law="Iron Law: Do not analyze automation feasibility for unconfirmed test cases." ;;
+        5) iron_law="Iron Law: Only generate scripts for confirmed cases marked as automatable/partial." ;;
         6) iron_law="" ;;
         *) iron_law="" ;;
     esac
