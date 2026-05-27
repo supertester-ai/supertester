@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stop hook for supertester plugin
-# Verify all phases are complete before allowing agent to stop
+# When phases are incomplete, block stop and tell Claude why (via decision/reason).
+# When all phases complete or no plan exists, allow stop with empty output.
 
 set -euo pipefail
 
@@ -14,24 +15,28 @@ escape_for_json() {
     printf '%s' "$s"
 }
 
-context=""
-
-if [ -f ".supertester/test_plan.md" ]; then
-    TOTAL=$(grep -c "### Phase" ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
-    TOTAL="${TOTAL:-0}"
-    COMPLETE=$(grep -c 'Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
-    COMPLETE="${COMPLETE:-0}"
-
-    if [ "$TOTAL" -eq "$COMPLETE" ] && [ "$TOTAL" -gt 0 ]; then
-        context="<STOP-CHECK>\\nAll ${TOTAL}/${TOTAL} phases complete. Safe to stop.\\n</STOP-CHECK>"
-    else
-        # Get list of incomplete phases
-        incomplete=$(grep -B2 '^\- \*\*Status:\*\* \(pending\|in_progress\)' ".supertester/test_plan.md" 2>/dev/null | grep "### Phase" || echo "unknown")
-        incomplete_escaped=$(escape_for_json "$incomplete")
-        context="<STOP-CHECK>\\nWARNING: Only ${COMPLETE}/${TOTAL} phases complete.\\nIncomplete phases:\\n${incomplete_escaped}\\nContinue working or ask user to confirm early stop.\\n</STOP-CHECK>"
-    fi
+# No plan file -> nothing to check, allow stop
+if [ ! -f ".supertester/test_plan.md" ]; then
+    printf '{}\n'
+    exit 0
 fi
 
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "Stop",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+TOTAL=$(grep -c "### Phase" ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
+TOTAL="${TOTAL:-0}"
+COMPLETE=$(grep -c 'Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
+COMPLETE="${COMPLETE:-0}"
+
+# All complete -> allow stop
+if [ "$TOTAL" -gt 0 ] && [ "$TOTAL" -eq "$COMPLETE" ]; then
+    printf '{}\n'
+    exit 0
+fi
+
+# Incomplete -> block with reason
+incomplete=$(grep -B2 '^\- \*\*Status:\*\* \(pending\|in_progress\)' ".supertester/test_plan.md" 2>/dev/null | grep "### Phase" || echo "unknown")
+reason="Supertester workflow incomplete: only ${COMPLETE}/${TOTAL} phases done. Incomplete: ${incomplete}. Continue working or ask the user to confirm early stop."
+reason_escaped=$(escape_for_json "$reason")
+
+printf '{\n  "decision": "block",\n  "reason": "%s"\n}\n' "$reason_escaped"
 
 exit 0
