@@ -79,6 +79,7 @@ This is the new P0 review layer. You must actively search for these gaps.
 
 - Does the requirement contain explicit copy/template/content but the cases only say "content is correct"?
 - Are field-by-field or item-by-item checks missing where the content itself is the requirement?
+- **Internal-code references**: do any cases use internal codes (`C-xxx`, `E-xxx`, `IR-xxx`, `CMS-xxx`, `CL-xxx`, `I-xxx`, `CTX-X`) as a **substitute for actual content** in `action` / `expected` / `key_assets` / `preconditions`? Cases must be self-contained — internal codes are allowed only in `feature` / `sub_refs` / `sources` (pure traceability fields), or as parenthetical annotations AFTER the literal content (e.g., `expected: 显示「请填写手机号」(C-004)`). Any field where a code carries the meaning instead of literal content is a **HIGH** issue.
 
 #### B. Process Feedback Gaps
 
@@ -140,6 +141,7 @@ Classify as **HIGH** when:
 - under-aggregation: ≥3 sibling singles that should have collapsed into a matrix (see 2a.A)
 - over-aggregation: a matrix that mixes verification_methods, evidence_types, or carries an action exceeding the 5-step ceiling (see 2a.B)
 - a matrix row lacks `source`, or a `verbatim: true` row's expected does not contain the literal copy
+- a case uses internal codes (`C-xxx`, `E-xxx`, `IR-xxx`, `CMS-xxx`, `CL-xxx`, `I-xxx`, `CTX-X`) as the sole content of `action` / `expected` / `key_assets` / `preconditions` instead of inlining the actual content (see 3.A)
 
 ## Review Record Format
 
@@ -192,6 +194,7 @@ Classify as **HIGH** when:
 - **Verbatim literal preservation:** PASS | FAIL
 - **5-step ceiling:** PASS | FAIL
 - **Group naming semantic:** PASS | FAIL
+- **Self-containment (no internal-code substitution):** PASS | FAIL
 
 ## Positive Observations
 - [what was done well]
