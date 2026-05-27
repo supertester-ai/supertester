@@ -84,8 +84,8 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 | 0 | using-supertester | — | 初始化 .supertester/ |
 | 1 | requirement-analysis | 需求文档 | parsed-requirements.md, clarifications.json |
 | 2 | requirement-association | Phase 1 complete | module-dependencies.md, implicit-requirements.md, cross-module-scenarios.md |
-| 3 | test-case-generation | Phase 2 complete + 用户确认 | functional-cases.md, deduplication-report.md |
-| 4 | automation-analysis | Phase 3 complete + 用户确认 | automation-analysis.md |
+| 3 | test-case-generation | Phase 2 complete + 用户确认 | functional-cases.yaml, deduplication-report.md |
+| 4 | automation-analysis | Phase 3 complete + 用户确认 | automation-analysis.yaml, automation-analysis.md |
 | 5 | automation-scripting | Phase 4 complete | *.spec.ts, manual-cases.md |
 | 6 | test-reporting | Phase 5 complete | reports/YYYY-MM-DD-*.md |
 

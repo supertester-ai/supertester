@@ -44,20 +44,21 @@ Phase 3
 ### Phase 3: 功能测试用例生成
 - [ ] 分析需求特征，选择合适的子生成器
 - [ ] 根据证据维度选择验证方式
-- [ ] 生成功能测试用例
+- [ ] 生成功能测试用例（输出 functional-cases.yaml，含 single / matrix / scenario_chain 三类）
+- [ ] 字段矩阵聚合（同字段/同规则集 ≥3 条候选必须合并为 type: matrix）
 - [ ] 去重
 - [ ] 检查关键测试资产是否在生成或去重中丢失
-- [ ] test-reviewer 审查
+- [ ] test-reviewer 审查（含矩阵聚合合理性 + verbatim 完整性）
 - [ ] 用户确认
-- **Completion Gate:** 行为覆盖与证据覆盖均可追踪，关键测试资产未丢失
+- **Completion Gate:** 行为覆盖与证据覆盖均可追踪，关键测试资产未丢失，无零散派生 single 群
 - **Status:** pending
 
 ### Phase 4: 自动化可行性分析
-- [ ] 分析每个测试用例的自动化潜力
+- [ ] 分析每个测试用例的自动化潜力（matrix 用例逐 row 评估）
 - [ ] 标记为 automatable / partial / manual
 - [ ] 说明哪些测试资产不适合完全自动化，需保留人工验证
-- [ ] 生成 automation-analysis.md
-- **Completion Gate:** 自动化边界明确，未强行脚本化所有测试资产
+- [ ] 生成 automation-analysis.yaml + automation-analysis.md
+- **Completion Gate:** 自动化边界明确（含 row 级），未强行脚本化所有测试资产
 - **Status:** pending
 
 ### Phase 5: 自动化脚本生成

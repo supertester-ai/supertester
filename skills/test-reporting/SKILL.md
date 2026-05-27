@@ -82,9 +82,18 @@ This rule is generic and applies across products. It is not limited to visual as
 
 For each `F-xxx`, `IR-xxx`, and `CMS-xxx`, report:
 
-- linked test cases
-- automation level
+- linked test cases (cite by `TC-xxx`; for matrix cases, cite `TC-xxx#group/row-index` when only a subset of rows covers the requirement)
+- automation level (case-level + row-level for matrix)
 - coverage status
+
+### 1a. Counting Conventions
+
+`functional-cases.yaml` is the canonical source. Statistics MUST distinguish two scales:
+
+- **case count**: number of entries in `cases[]` (regardless of `type`)
+- **execution-point count**: `single` cases count as 1; `matrix` cases contribute `sum(groups[].rows.length)`; `scenario_chain` cases count as `1 + branches.length`
+
+Always report both. A report that only shows case count understates true coverage breadth when matrix cases exist; a report that only shows execution-point count understates the conceptual case count and inflates apparent automation density.
 
 ### 2. Coverage Dimensions
 
@@ -168,8 +177,11 @@ If multiple modules are involved, you may generate:
 ## Reporting Rules
 
 - do not reduce the report to counts or file listings
+- always report both case count and execution-point count when matrix cases are present
 - explain why some coverage is intentionally manual or partial
 - if an asset is not automated but is preserved manually, say so explicitly
 - if an asset is neither automated nor manually preserved, mark it as missing
 - if a dimension covers only final behavior but not the relevant process, contract, or evidence depth, mark it as partial
+- when a matrix case has rows at mixed automation levels (e.g. some `automatable`, some `manual`), report the breakdown rather than collapsing to a single label
+- preserve `verbatim: true` markers in the traceability matrix — they indicate copy-fidelity assets that must remain literal in any downstream test management system
 - write in reusable, domain-agnostic language; the structure must work across future products

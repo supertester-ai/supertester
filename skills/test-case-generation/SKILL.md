@@ -16,6 +16,9 @@ description: Use when generating functional test cases from confirmed requiremen
 > **测试设计不是只生成“行为用例”，还要保留关键测试资产。**
 > 如果需求中存在关键内容、规则、列表、状态断言、集成契约或证据链，它们不能在生成与去重过程中被概括丢失。
 
+> **同字段/同规则下的多分区必须聚合为 matrix 用例，不准平铺为独立 TC。**
+> 当满足同字段（或同规则集）+ 同验证方式 + 同证据类型 + 共享前置条件 + 仅"输入条件 → 预期结果"维度变化 + 候选 ≥3 条时，必须输出为单条 `type: matrix` 用例 + 分组矩阵（`groups[].rows[]`），公共元数据只写一次。平铺为 18 条仅"条件→预期"差异的独立 TC 视为零散派生 (sprawling)，列为 HIGH 级问题。
+
 <HARD-GATE>
 在用户确认功能用例之前，不准进入 automation-analysis 阶段。
 用例未经 test-reviewer 审查之前，不准提交给用户确认。
@@ -135,23 +138,54 @@ description: Use when generating functional test cases from confirmed requiremen
    - **证据分类标注（强制）**: 对上述清单中每个待验证项标注其证据采集方式——纯文本内容用 `ui_text_assertion`，视觉布局或品牌元素用 `manual_visual_check` 或 `screenshot_comparison`，接口响应用 `api_response_assertion`，状态或数据变更用 `storage_assertion`，弹窗或 Toast 用 `toast_alert_assertion`，结构化输出用 `schema_assertion`。此标注直接映射到 Step 2 用例的验证方式字段，不得遗漏
    - **环境条件渲染清单（强制提取）**: 从需求中识别所有基于环境因素（地理区域/IP归属地、用户语言偏好、设备类型、浏览器特性、合规管辖区等）进行条件渲染的 UI 区域。对每个条件渲染区域记录：(a) 条件维度名称，(b) 该维度的完整取值枚举，(c) 每个取值下的渲染差异（展示/隐藏/替换）。此清单在 Step 2 中必须为每个条件维度生成决策表或等价类用例，穷举所有取值分区——不能仅覆盖默认值或最常见值而遗漏其他分区
 4. 根据映射表决定调用哪些生成器
-5. 为该功能选择合适的用例粒度：
-   - **组合用例**: 适合矩阵、规则组合、共享资源、异常恢复
-   - **证据链用例**: 适合需要多观测面共同验证的功能
-6. 记录选择理由到 findings.md
+5. 为该功能选择合适的用例粒度（对应 YAML `type` 字段）：
+   - **`type: single`**: 单点行为、独立验证、不可拆解的最小测试单元
+   - **`type: matrix`**: 同字段或同规则集下 ≥3 条仅"条件→预期"维度变化的分区集合。**强制触发条件**（满足全部即必须聚合）：(a) 同一字段或同一规则集；(b) 同一 `verification_method`；(c) 同一 `evidence_types`；(d) 共享前置条件；(e) 行为差异只在"输入/触发条件"和"预期"两列。**禁止聚合**（任一命中即拆为 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单 row action 超过 5 个编号步骤
+   - **`type: scenario_chain`**: 多步骤端到端流程、共享资源冲突、异常恢复链、多观测面共同验证的证据链路径
+6. 记录粒度选择理由到 findings.md，含本功能下识别出的所有 matrix 候选清单（字段名 + 分组维度 + 候选 row 数）
 
 ### Step 2: 调用子生成器
 
-按选择的生成器组合，为每个功能生成用例。每个用例必须包含：
-- 用例 ID (TC-xxx)
-- 所属模块和功能
-- 生成器来源
-- 前置条件
-- 测试步骤
-- 预期结果
-- 主要证据类型
-- 验证方式（从验证方式枚举中选择，不得留空。枚举值：ui_text_assertion / ui_attribute_assertion / api_response_assertion / url_assertion / storage_assertion / screenshot_comparison / manual_visual_check / log_event_assertion / toast_alert_assertion / schema_assertion）
-- 需求溯源（文件 + 行号）
+按选择的生成器组合，为每个功能生成用例。**输出形式是 YAML 节点，不是 Markdown 段落**。
+
+#### 通用元数据字段（所有 type 必填）
+- `id`: 用例 ID (TC-xxx)
+- `title`: 用例标题，简短描述意图
+- `type`: `single` | `matrix` | `scenario_chain`
+- `module`: 所属模块
+- `feature`: 功能 ID (F-xxx)，可附 `sub_refs: [E-xxx, I-xxx]`
+- `verification_method`: 验证方式（从枚举选择，不得留空。枚举值：`ui_text_assertion` / `ui_attribute_assertion` / `api_response_assertion` / `url_assertion` / `storage_assertion` / `screenshot_comparison` / `manual_visual_check` / `log_event_assertion` / `toast_alert_assertion` / `schema_assertion`）
+- `evidence_types`: 列表，从 UI / API / DB / Event / File / Message / Log / Metrics / External 中选择 ≥1 项
+- `automation`: `automatable` | `partial` | `manual`
+- `preconditions`: 共享前置条件列表
+- `key_assets`: 关键资产说明列表（含逐字文案/规则枚举/集成契约引用）；无则写 `[]`
+
+#### type 决定下层结构
+
+**`type: single`** 必含：
+- `steps`: 测试步骤列表（单步直接写字符串；多步用 `|` block scalar + `1. 2. 3.` 数字前缀，不允许 nested list）
+- `expected`: 预期结果列表（同上规则）
+- `sources`: 溯源数组，每项 `{ file, lines, text? }`
+
+**`type: matrix`** 必含：
+- `groups`: 分组数组。每个分组：
+  - `name`: 分组名（对应需求中"字段校验的某一个维度"，如"IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
+  - `rows`: 2 列结构数组，每个 row 形如：
+    ```yaml
+    - action: 描述触发条件和操作（单步字符串；多条件用 | + 1. 2. 3.）
+      expected: 预期结果（单字符串；多预期同样用 | + 1. 2. 3.）
+      source: 单字符串溯源标记（如 "L35" / "IR-009"）
+      verbatim: true   # 可选；标记 expected 中引号内文案需逐字断言
+      status: blocked  # 可选；blocked / inferred；表示推测或被阻塞
+      automation: manual  # 可选；row 级覆盖父用例的 automation
+    ```
+  - **5-step ceiling**: 单个 row 的 `action` 不允许超过 5 个编号步骤；超出表明应升级为独立 `single` 用例
+
+**`type: scenario_chain`** 必含：
+- `steps`: 步骤列表（同 single）
+- `expected`: 预期结果列表
+- `sources`: 溯源数组
+- 可选 `branches`: 替代路径或错误恢复路径数组，每项含 `name` + `steps` + `expected`
 
 如果功能包含关键测试资产，至少满足以下规则：
 - **内容资产**: 用例中写出要校验的关键内容类型，不得只写“内容正确”
@@ -177,6 +211,8 @@ description: Use when generating functional test cases from confirmed requiremen
 - **状态转换链完整性自检（强制）**: 对每个涉及输入清洗、格式转换或自动补全的功能，检查是否建模了完整的状态转换链（原始输入 → 转换处理 → 转换后重校验）。仅验证转换结果而未验证转换触发条件和转换后的下游校验联动视为 state_transition 缺陷，立即补充后再进入 Step 3 去重
 - **多语言完整性自检（强制）**: 生成完每个模块的全部用例后，回查 parsed-requirements.md 的 Multi-Language Inventory。对其中每个标注了多语言要求的文案项，检查是否每种语言都有独立的用例分支，且每个分支的预期结果中包含该语言环境下的逐字文案文本（不能仅写“对应语言文案正确”或“切换语言后文案符合预期”）。仅覆盖部分语言而遗漏其他语言、或虽有用例但预期结果中缺少逐字文案均视为 contract_verification 缺陷，立即补充后再进入 Step 3 去重
 - **访问路径完整性自检（强制）**: 生成完每个模块的全部用例后，回查 Step 1 中识别的所有访问路径。对每条路径检查是否有独立的用例覆盖其核心场景（入口展示、输入校验、执行流程、结果反馈）；若该路径涉及资源配额或频率限制，额外检查配额相关场景是否覆盖。如果某条路径完全没有用例，立即补充后再进入 Step 3 去重
+- **字段矩阵聚合自检（强制）**: 生成完每个模块的全部用例后，扫描所有 `type: single` 用例。如果同一功能下存在同字段（或同规则集）+ 同 `verification_method` + 同 `evidence_types` + 共享 `preconditions` + 仅"输入条件 → 预期结果"维度变化的独立用例 ≥3 条，必须合并为单条 `type: matrix` 用例，按维度命名 `groups[]`，公共元数据只写一次。**聚合时必须保留**：(a) 每个 row 的 `source` 字段；(b) 涉及逐字文案的 row 标注 `verbatim: true` 且 expected 完整写出逐字内容；(c) 推测或阻塞项标注 `status: blocked/inferred`。**禁止聚合**（任一命中即保留为独立 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单 row action 超过 5 个编号步骤
+- **matrix row 粒度自检（强制）**: 生成完 matrix 用例后，逐行检查每个 row 的 `action`：(a) 单步动作直接写字符串；(b) 多步动作必须使用 YAML block scalar `|` + 数字前缀 `1. 2. 3.`，禁止使用 nested list（`-` 列表）；(c) 单 row 的编号步骤数 ≤5，超出则拆出为独立 `type: single` 用例并在 findings.md 标注拆分原因
 生成时优先遵循：
 - 精准覆盖优于平均铺开
 - 可验证优于抽象描述
@@ -236,27 +272,29 @@ description: Use when generating functional test cases from confirmed requiremen
 
 这些场景的证据类型为：UI（按钮状态）+ API（请求次数）+ DB（数据一致性）+ Log（操作日志）。关键操作按钮必须覆盖这些场景，防止因用户误操作或网络延迟导致的数据重复问题。
 
-### Step 3: 去重
+### Step 3: 去重与矩阵聚合
 
 去重策略：
 - **exact_duplicate**: 相同输入、相同预期
 - **subset_duplicate**: 一个用例完全覆盖另一个
 - **redundant_boundary**: 边界值与等价类冗余
 - **overlapping_state**: 状态转换已被场景流覆盖
+- **mergeable_matrix**: 同字段/同规则集下 ≥3 条仅"条件→预期"差异的 single 用例 → 必须合并为单条 `type: matrix`（见 Step 2 字段矩阵聚合自检的强制触发条件）
 
 高价值资产保护规则：
-- 如果一个用例包含关键规则、完整枚举、关键内容校验、状态/数据断言、集成异常或证据链，则不能因为“主流程相似”被直接吞并
+- 如果一个用例包含关键规则、完整枚举、关键内容校验、状态/数据断言、集成异常或证据链，则不能因为"主流程相似"被直接吞并
 - 如果两条用例行为相似，但观测面不同，则视为不同用例
-- 如果矩阵类资产无法完整塞入单条用例，应在 deduplication-report.md 中明确保留原因
-- “代表值用例”不能替代“完整规则列表本身是需求”的情况
+- 矩阵聚合不是去重 —— 它把 N 条 `single` 折叠为 1 条 `matrix` + N 个 `rows`，**row 数 = 原候选数**，零信息丢失。聚合后 row 中的 `expected` 逐字文案、`source` 溯源、`verbatim` 标记一个都不能少
+- "代表值用例"不能替代"完整规则列表本身是需求"的情况
 
 合并规则：
-- 边界值 + 等价类冗余 -> 保留边界值
-- 异常场景覆盖正常场景 -> 保留异常场景
+- 边界值 + 等价类冗余 → 保留边界值
+- 异常场景覆盖正常场景 → 保留异常场景
 - 单点 UI 用例与状态断言用例不互相吞并
 - 行为用例与证据链用例不互相吞并
+- 触发 `mergeable_matrix` 的候选必须聚合，**不允许以"保持可读性"为由放弃聚合**
 
-去重报告写入 `.supertester/test-cases/deduplication-report.md`
+去重 + 聚合报告写入 `.supertester/test-cases/deduplication-report.md`，对每条 `mergeable_matrix` 记录：合并前的候选 TC-id 列表 → 合并后的 matrix TC-id + group 名 + row 数
 
 ### Step 4: test-reviewer 审查
 
@@ -281,8 +319,9 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 ### Step 5: 用户确认
 
 向用户展示：
-- 用例统计（原始数 vs 去重后）
-- 按模块分组的用例列表
+- **用例统计**：原始候选数 vs 聚合/去重后用例数 vs 执行点数（matrix rows + single + scenario_chain steps 合计）
+- **按 type 分类**：single 数 / matrix 数（含 group/row 分布）/ scenario_chain 数
+- 按模块分组的用例列表（含矩阵聚合摘要）
 - 审查结果摘要
 
 用户确认后更新 test_plan.md Phase 3 -> complete。
@@ -296,50 +335,175 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
   ```
 - 如果 Max Phase > 3 或未设置，正常提示用户可进入 Phase 4。
 
-## 输出格式 (functional-cases.md)
+## 输出格式 (functional-cases.yaml)
 
-```markdown
-# 功能测试用例
+**载体**：单一 YAML 文件 `.supertester/test-cases/functional-cases.yaml` 作为机器可读的唯一来源真理。所有下游 skill（automation-analysis / automation-scripting / test-reporting）和外部测试管理系统入库均从此文件解析。
 
-## 生成统计
-- 原始用例数: N
-- 去重后: M
-- 去重详情见: deduplication-report.md
+### 顶层结构
 
----
+```yaml
+meta:
+  module: <模块名>
+  total_cases: <用例数 N>      # type 维度总数
+  total_rows: <执行点数 M>     # matrix rows + single + scenario_chain 之和
+  dedup_report: deduplication-report.md
+  generated_at: YYYY-MM-DD
 
-## TC-001: [用例名称]
-**模块:** [模块名]
-**自动化可行性:** automatable | partial | manual
-**功能:** F-001 [功能名]
-**验证方式:** [ui_text_assertion | ui_attribute_assertion | api_response_assertion | url_assertion | storage_assertion | screenshot_comparison | manual_visual_check | log_event_assertion | toast_alert_assertion | schema_assertion]
-**证据类型:** UI | API | DB | Event | File | Message | Log | Metrics | External System
-
-### 前置条件
-- [条件1]
-- [条件2]
-
-### 测试步骤
-1. [步骤1]
-2. [步骤2]
-
-### 预期结果
-- [结果1]
-- [结果2]
-
-### 需求溯源
-| 来源文件 | 行号 | 原始需求文本 |
-|----------|------|-------------|
-| `<filename>` | XX-XX | "原始文本" |
-
-### 关键资产
-- [需要保留的规则/列表/内容/状态断言；若无则写“无”]
+cases:
+  - <case 1>
+  - <case 2>
+  ...
 ```
+
+### type: single 示例
+
+```yaml
+- id: TC-027
+  title: 手机号修改 → 同步至账户安全手机
+  type: single
+  module: 免费会员信息确认
+  feature: F-003
+  sub_refs: [CMS-001, CL-012]
+  verification_method: api_response_assertion
+  evidence_types: [UI, API, DB]
+  automation: automatable
+  preconditions:
+    - CTX-B
+    - 账户安全手机原值 = "13800000000"
+    - 用户输入手机号 = "13911111111"（已修改）
+  steps:
+    - 进入信息确认页
+    - 提交表单
+  expected:
+    - 账户安全手机字段 = "13911111111"
+    - VO 公司信息中手机号 = "13911111111"
+  sources:
+    - { file: requirements.md, lines: "15", text: "手机若修改则同步至账户信息的安全手机" }
+  key_assets:
+    - 账户同步契约
+```
+
+### type: matrix 示例
+
+```yaml
+- id: TC-043
+  title: 手机号字段校验矩阵
+  type: matrix
+  module: 免费会员信息确认
+  feature: F-005
+  verification_method: ui_text_assertion
+  evidence_types: [UI, External]
+  automation: partial      # 父级；row 可单独覆盖
+  preconditions:
+    - CTX-B
+  key_assets:
+    - C-004 必填文案逐字
+    - C-005 校验失败文案逐字
+    - E-001 区号映射完整枚举
+  groups:
+    - name: IP 归属 → 默认区号
+      rows:
+        - action: 模拟 IP = 中国大陆，进入信息确认页
+          expected: 区号下拉默认显示 "+86"
+          source: L35
+        - action: 模拟 IP = 中国香港，进入信息确认页
+          expected: 区号下拉默认显示 "+852"
+          source: L36
+        - action: 模拟 IP = 中国澳门，进入信息确认页
+          expected: 区号下拉默认显示 "+853"
+          source: L37
+        - action: 模拟 IP = 中国台湾，进入信息确认页
+          expected: 区号下拉默认显示 "+886"
+          source: L38
+        - action: 模拟 IP 识别失败
+          expected: 默认 "+86"（推测）
+          source: IR-009
+          status: blocked
+
+    - name: 长度 × 区号
+      rows:
+        - action: |
+            1. 区号选择 +86
+            2. 手机号输入 "13800001234"（11 位纯数字）
+            3. 提交
+          expected: 校验通过，无 C-005 提示
+          source: L41
+          automation: automatable
+        - action: |
+            1. 区号选择 +86
+            2. 手机号输入 "1380000abc"（含字母）
+            3. 提交
+          expected: 逐字显示「请填写正确的手机号」(C-005)
+          source: L41
+          verbatim: true
+          automation: automatable
+        - action: |
+            1. 区号选择 +852
+            2. 手机号输入 "12345678"（8 位数字）
+            3. 提交
+          expected: 校验通过
+          source: L41
+          automation: automatable
+
+    - name: 必填
+      rows:
+        - action: 手机号留空，提交
+          expected: 逐字显示「请填写手机号」(C-004)
+          source: L40
+          verbatim: true
+          automation: automatable
+```
+
+### type: scenario_chain 示例
+
+```yaml
+- id: TC-029
+  title: 提交期间网络中断后重试 → 幂等不双写
+  type: scenario_chain
+  module: 免费会员信息确认
+  feature: F-003
+  sub_refs: [CMS-020]
+  verification_method: api_response_assertion
+  evidence_types: [UI, API, DB]
+  automation: partial
+  preconditions:
+    - CTX-B
+  steps:
+    - |
+      1. 用户修改手机号
+      2. 点击提交
+      3. 注入网络中断
+      4. 网络恢复后用户再次点击提交
+  expected:
+    - 后端只接收到一次写入请求
+    - 账户安全手机更新只发生一次
+    - VO 公司信息中手机号 = 最新输入值
+  sources:
+    - { file: requirements.md, lines: "18-19" }
+  key_assets:
+    - 幂等性契约 CMS-020
+  branches:
+    - name: 网络恢复后提交失败
+      steps:
+        - 网络恢复但服务端返回 5xx
+      expected:
+        - 用户看到失败提示
+        - 数据未被部分写入
+```
+
+### YAML 书写硬规则
+
+1. **`action` / `expected` 的多步内容必须用 `|` block scalar + 数字前缀**（`1.` `2.` `3.`），不允许使用 nested list（`-` 列表）—— 不同 YAML 解析器对嵌套列表的语义不一致，会导致入库踩坑
+2. **`source` 单行字符串**（如 `L35` / `IR-009` / `CMS-028 第3条`），禁止空值
+3. **`verbatim: true`** 的 row 表示 `expected` 中引号 `「」` 或双引号内的文案需逐字断言，自动化脚本不得参数化、不得改写
+4. **`status: blocked`** 的 row 表示需求未明确或被阻塞，必须配合 `source` 指向 IR-xxx 或 findings.md 中的待澄清记录
+5. **逐字断言不可代号化**：`expected: C-005` 是错误写法，必须写 `expected: 逐字显示「请填写正确的手机号」(C-005)`
+6. **`groups[].name` 必须有业务语义**，不允许写 "分组1" "分组2" —— 应当反映分组维度（如 "IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
 
 ## 2-Action Rule 落地
 
-- 为 2 个功能生成了用例 -> 立即追加到 functional-cases.md
-- 完成了 2 轮去重分析 -> 立即更新 deduplication-report.md
+- 为 2 个功能生成了用例 -> 立即追加到 functional-cases.yaml
+- 完成了 2 轮去重/聚合分析 -> 立即更新 deduplication-report.md
 
 ## Red Flags
 
@@ -352,6 +516,9 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 | "用例太多了" | 数量不等于质量。精准覆盖 > 全面铺开 |
 | "有主流程就算覆盖了" | 如果缺少规则、状态、集成或证据链覆盖，仍然会遗漏高价值测试点 |
 | "代表值足够了" | 当完整列表、矩阵或约束本身是需求时，代表值不能替代完整覆盖 |
+| "矩阵聚合会让用例变难读" | matrix 用例的 row 是显式枚举，零信息丢失，反而更利于审阅和入库 |
+| "matrix 用例的 row 可以省略 source" | row 级 source 是溯源链的最小单位，缺失等于该 row 未对齐需求 |
+| "verbatim 标记可有可无" | 没有 verbatim 标记，自动化脚本就敢做文案变量化，逐字断言资产会被悄悄抹平 |
 
 ## 本阶段完成标准
 
@@ -359,5 +526,7 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 - 每个 F-xxx 都至少有行为层覆盖
 - 关键规则、列表、内容和状态断言未在生成或去重中丢失
 - 多证据类型功能已体现多观测面验证
-- 复杂组合规则已通过组合用例或矩阵方式保留
+- 复杂组合规则已通过 `scenario_chain` 或 `matrix` 方式保留
+- 同字段/同规则多分区已聚合为 `type: matrix`，不存在零散派生的 single 群
+- `functional-cases.yaml` 通过 YAML 语法校验
 - reviewer 已确认不存在明显的覆盖维度缺口

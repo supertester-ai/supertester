@@ -2,7 +2,7 @@
 
 ## 总则
 
-子生成器不是彼此孤立的“出题器”，而是围绕同一个目标协作：
+子生成器不是彼此孤立的"出题器"，而是围绕同一个目标协作：
 - 覆盖关键行为
 - 保留关键测试资产
 - 生成可验证的结果
@@ -13,6 +13,33 @@
 2. 这个功能要靠什么证据证明它正确？
 
 如果一个功能需要多种证据类型，请在生成时同步体现，不要只生成最表层的 UI 或 happy path 用例。
+
+## 生成器的输出形态
+
+生成器的输出**不是独立的 TC 节点**，而是中间结构 —— **`partition_group`**（分区组）。SKILL.md Step 2 / Step 3 根据聚合规则把这些 partition_group 折叠成最终的 `type: matrix` 或拆为 `type: single` YAML 用例。
+
+`partition_group` 的中间结构：
+
+```yaml
+partition_group:
+  generator: equivalence | boundary | decision_table | exception | state | scenario | security | performance | prompt
+  field_or_rule: <字段名 / 规则集名>      # 聚合判定的关键键
+  verification_method: <枚举>             # 聚合判定的关键键
+  evidence_types: [...]                   # 聚合判定的关键键
+  preconditions: [...]                    # 聚合判定的关键键
+  group_name: <对应将来 matrix 的 groups[].name>
+  rows:
+    - action: ...
+      expected: ...
+      source: ...
+      verbatim?: true
+      status?: blocked | inferred
+```
+
+**适用规则**：
+- 等价类 / 边界值 / 决策表 生成器**默认按 partition_group 输出**，由 Step 2 判定是否聚合为 matrix（≥3 条且通过强制触发条件）或在不足 3 条时拆为 single
+- 异常场景 / 状态转换 / 场景流 / 安全 / 性能 / Prompt 回归 生成器输出**以 scenario_chain 或 single 为主**，不强制走 partition_group
+- 任何 partition_group 中的 row 都必须保留 `source` —— 这是溯源的最小单位
 
 ## 证据维度检查
 
@@ -51,39 +78,59 @@
 
 **方法:**
 - 将输入域划分为有效等价类和无效等价类
-- 每个等价类取一个代表值生成用例
-- 正向用例（有效类）+ 反向用例（无效类）
+- 每个等价类生成一条 row（条件 + 预期 + 溯源），**整体作为一个 partition_group 输出**
+- 不在生成器内部预先分配 TC-id 或决定是否独立成 TC，这个由 SKILL.md Step 2 决定
 
 **注意事项:**
-- 当需求强调“完整名单”“完整类别”“完整映射”时，不要只保留代表值
-- 如果等价类背后还存在状态副作用或外部反馈，需与场景流/证据链一起使用
+- 当需求强调"完整名单""完整类别""完整映射"时，必须每个类目独立成 row（不能用代表值代替完整名单）
+- 如果等价类背后还存在状态副作用或外部反馈，把副作用相关的 row 单列一个 partition_group（不同 verification_method/evidence_types 不应聚合到同一 group）
 
-**输出结构:**
+**输出结构（partition_group YAML 节点）:**
+
+```yaml
+partition_group:
+  generator: equivalence
+  field_or_rule: email_format
+  verification_method: ui_text_assertion
+  evidence_types: [UI]
+  preconditions:
+    - 进入注册表单
+  group_name: 邮箱格式校验
+  rows:
+    - action: 输入 "user@example.com"
+      expected: 校验通过
+      source: L12
+    - action: 输入 "user+tag@example.com"
+      expected: 校验通过
+      source: L12
+    - action: 留空提交
+      expected: 逐字显示「请填写邮箱」
+      source: L13
+      verbatim: true
+    - action: 输入 "user@" (无域名)
+      expected: 逐字显示「邮箱格式不正确」
+      source: L14
+      verbatim: true
+    - action: 输入 "user@@example.com" (多个 @)
+      expected: 逐字显示「邮箱格式不正确」
+      source: L14
+      verbatim: true
 ```
-等价类分区:
-  有效类: [class1, class2, ...]
-  无效类: [class3, class4, ...]
 
-用例:
-  TC-xxx: 使用 class1 代表值 -> 预期成功
-  TC-xxx: 使用 class3 代表值 -> 预期失败
-```
-
-**示例:** 邮箱输入
-- 有效类: 标准邮箱 (user@example.com), 带特殊字符 (user+tag@example.com)
-- 无效类: 空值, 无@符号, 无域名, 多个@符号
+Step 2 接收后：本 group 共 5 条 row 且满足强制触发条件 → 折叠为 `type: matrix` 用例的一个 group；若总 row 数 <3，则拆为 single 用例。
 
 ## 2. 边界值生成器
 
 **适用场景:** 数值范围、字符串长度、集合大小
 
 **方法:**
-- 对每个边界取: 边界值、边界-1、边界+1
-- 特殊值: 0, 空, null, 最大值
+- 对每个边界生成 row：边界值、边界-1、边界+1
+- 特殊值 row：0, 空, null, 最大值
+- **整体作为一个 partition_group 输出**，按"边界维度"命名 group_name
 
 **注意事项:**
 - 边界值不只用于输入，也可用于配额、阈值、容量、数量、时间窗、重试次数等规则
-- 如果边界命中后会触发状态变化、限流、回滚或额外提示，应补充对应证据断言
+- 如果边界命中后会触发状态变化、限流、回滚或额外提示，应补充对应证据断言（必要时拆出独立 group 或独立 single 用例，避免不同 evidence_types 混入同一 group）
 
 **边界模式:**
 | 类型 | 测试点 |
@@ -93,7 +140,32 @@
 | 集合大小 [0, maxSize] | 0, 1, maxSize-1, maxSize, maxSize+1 |
 | 字符类别（输入校验场景） | 各空白变体分别测试（空格、制表符、换行符、回车符）、ASCII控制字符区间（0x00-0x1F及0x7F）、不安全分隔符集（尖括号、花括号、管道符、反斜杠、脱字符、反引号等RFC定义的非安全字符）、非ASCII多字节Unicode字符 |
 
-**注意**: 对于文本输入校验类需求，字符类别边界与字符串长度边界同等重要。如果需求定义了输入合法性规则（格式约束、字符白名单/黑名单、编码要求），必须对上表中每个字符类别生成独立边界用例，不能仅用空格代表所有空白类字符。
+**注意**: 对于文本输入校验类需求，字符类别边界与字符串长度边界同等重要。如果需求定义了输入合法性规则（格式约束、字符白名单/黑名单、编码要求），必须对上表中每个字符类别生成独立 row，不能仅用空格代表所有空白类字符。
+
+**输出结构（partition_group YAML 节点）:**
+
+```yaml
+partition_group:
+  generator: boundary
+  field_or_rule: phone_length_+86
+  verification_method: ui_text_assertion
+  evidence_types: [UI]
+  preconditions:
+    - 区号选择 +86
+  group_name: 长度 × 区号
+  rows:
+    - action: 输入 "1380000123" (10 位)
+      expected: 逐字显示「请填写正确的手机号」
+      source: L41
+      verbatim: true
+    - action: 输入 "13800001234" (11 位)
+      expected: 校验通过
+      source: L41
+    - action: 输入 "138000012345" (12 位)
+      expected: 逐字显示「请填写正确的手机号」
+      source: L41
+      verbatim: true
+```
 
 ## 3. 异常场景生成器
 
@@ -169,30 +241,47 @@
 1. 列出所有条件
 2. 列出所有动作
 3. 生成条件组合矩阵
-4. 标记每种组合的预期动作
-5. 优化：合并无差异的列
+4. 每条规则（Rule）作为一条 row：`action` 列出该规则下所有条件取值（用 `|` block scalar + `1. 2. 3.`），`expected` 列出对应动作
+5. 优化：合并无差异的规则（在 group 末尾以注释或独立 row 说明合并依据）
+6. **整体作为一个 partition_group 输出**
 
 **注意事项:**
-- 决策表优先用于“组合本身是风险”的场景，而不是事后把所有内容拆回代表值
-- 如果矩阵规模过大，可压缩为高风险组合，但必须在报告中说明省略规则
-- 如果矩阵命中后会产生不同观测面结果，预期中要明确这些差异
+- 决策表优先用于"组合本身是风险"的场景，而不是事后把所有内容拆回代表值
+- 如果矩阵规模过大，可压缩为高风险组合，但必须在 deduplication-report.md 中说明省略规则及保留依据
+- 如果矩阵命中后会产生不同观测面结果（如部分规则触发 API 写入、部分仅展示 UI），把不同 evidence_types 的规则拆为多个 partition_group，避免 evidence_types 不一致
 
-**输出结构:**
-```
-条件:
-  C1: [条件1描述]
-  C2: [条件2描述]
+**输出结构（partition_group YAML 节点）:**
 
-动作:
-  A1: [动作1描述]
-  A2: [动作2描述]
-
-| Rule | C1 | C2 | A1 | A2 |
-|------|----|----|----|----|
-| R1   | T  | T  | X  |    |
-| R2   | T  | F  |    | X  |
-| R3   | F  | T  |    | X  |
-| R4   | F  | F  |    |    |
+```yaml
+partition_group:
+  generator: decision_table
+  field_or_rule: discount_rule_matrix
+  verification_method: ui_text_assertion
+  evidence_types: [UI]
+  preconditions:
+    - 进入结算页
+  group_name: 折扣规则决策矩阵
+  rows:
+    - action: |
+        1. C1: 用户是 VIP = true
+        2. C2: 订单金额 ≥ 100 = true
+      expected: 折扣 = 20%；展示 "VIP 满减"
+      source: L88
+    - action: |
+        1. C1: 用户是 VIP = true
+        2. C2: 订单金额 ≥ 100 = false
+      expected: 折扣 = 10%；展示 "VIP 普通折扣"
+      source: L89
+    - action: |
+        1. C1: 用户是 VIP = false
+        2. C2: 订单金额 ≥ 100 = true
+      expected: 折扣 = 5%；展示 "满减促销"
+      source: L90
+    - action: |
+        1. C1: 用户是 VIP = false
+        2. C2: 订单金额 ≥ 100 = false
+      expected: 无折扣
+      source: L91
 ```
 
 ## 7. 安全测试生成器
