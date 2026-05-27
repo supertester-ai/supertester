@@ -1,14 +1,10 @@
 # Supertester
 
-面向 AI coding agent 的测试工作流插件。它把需求分析、测试设计、自动化可行性判断、脚本生成和最终报告串成一条可追踪、可恢复、可审查的流程，而不是一次性输出一批测试内容。
+面向 Claude Code 的测试工作流插件。它把需求分析、测试设计、自动化可行性判断、脚本生成和最终报告串成一条可追踪、可恢复、可审查的流程，而不是一次性输出一批测试内容。
 
-当前仓库的核心不是传统 `src/` 应用，而是一套由 `skills/`、`hooks/`、`templates/`、`agents/` 和 `.opencode/` 组成的测试能力编排资产。
+当前仓库的核心不是传统 `src/` 应用，而是一套由 `skills/`、`hooks/`、`templates/` 和 `agents/` 组成的测试能力编排资产。
 
 ## Installation
-
-**Note:** 安装方式因平台而异。
-
-### Claude Code (Supertester Marketplace)
 
 Supertester 提供了 Claude Code 可用的插件市场元数据。
 
@@ -24,117 +20,13 @@ Supertester 提供了 Claude Code 可用的插件市场元数据。
 /plugin install supertester@supertester
 ```
 
-### Claude Code (Direct Git Install)
-
 如果你不走 marketplace，也可以直接从 git 仓库安装：
 
 ```bash
 /plugin add https://github.com/supertester-ai/supertester.git
 ```
 
-### OpenCode
-
-告诉 OpenCode：
-
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/supertester-ai/supertester/refs/heads/main/.opencode/INSTALL.md
-```
-
-详细说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
-
-### Codex
-
-Codex 下必须以**完整插件**方式安装，不能只挂 `skills/`。否则 `test-reviewer` 和 hook 自动化行为都不会生效。
-
-当前推荐的 Codex 安装方式是按官方 **local marketplace** 模型安装，而不是把这个仓库直接当成 marketplace 根目录。
-
-这个仓库本身是**插件仓库**，插件入口在：
-
-- Codex 插件清单：`.codex-plugin/plugin.json`
-
-对 Codex 来说，更稳妥的本地安装方式是使用 **personal marketplace**：
-
-1. 先把仓库放到本地插件目录，例如：
-
-```bash
-git clone https://github.com/supertester-ai/supertester.git ~/.codex/plugins/supertester
-```
-
-Windows PowerShell 示例：
-
-```powershell
-git clone https://github.com/supertester-ai/supertester.git "$env:USERPROFILE\.codex\plugins\supertester"
-```
-
-2. 创建或更新个人 marketplace 文件 `~/.agents/plugins/marketplace.json`，让它指向这个插件目录：
-
-```json
-{
-  "name": "supertester",
-  "interface": {
-    "displayName": "Supertester"
-  },
-  "plugins": [
-    {
-      "name": "supertester",
-      "source": {
-        "source": "local",
-        "path": "./.codex/plugins/supertester"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Coding"
-    }
-  ]
-}
-```
-
-3. 重启 Codex，打开 `/plugins`，在 `Supertester` marketplace 下安装并启用 `supertester`。
-
-Codex 安装后会把运行副本物化到：
-
-```text
-~/.codex/plugins/cache/supertester/supertester/local/
-```
-
-插件启用状态会记录到：
-
-```toml
-[plugins.'supertester@supertester']
-path = '~/.codex/plugins/cache/supertester/supertester/local'
-```
-
-如果你修改了插件源码，需要同步更新 marketplace 指向的本地插件目录，然后重启 Codex 让它重新读取。
-
-详细说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
-
-### OpenClaw
-
-OpenClaw 支持工作区安装和全局安装。
-
-工作区安装：
-
-```bash
-mkdir -p .openclaw/skills
-git clone https://github.com/supertester-ai/supertester.git /tmp/supertester
-cp -R /tmp/supertester/skills .openclaw/skills/supertester
-```
-
-全局安装：
-
-```bash
-mkdir -p ~/.openclaw/skills
-git clone https://github.com/supertester-ai/supertester.git /tmp/supertester
-cp -R /tmp/supertester/skills ~/.openclaw/skills/supertester
-```
-
-详细说明见 [`.openclaw/skills/supertester/SKILL.md`](.openclaw/skills/supertester/SKILL.md)。
-
-### Continue
-
-Continue 的安装方式见 [`.continue/INSTALL.md`](.continue/INSTALL.md)。
+详细说明见 [`docs/installation.md`](docs/installation.md)。
 
 ## 它解决什么问题
 
@@ -181,9 +73,9 @@ flowchart TD
 
 ## 高保真测试设计
 
-Supertester 不只追求“行为覆盖”，还会显式保护高价值测试资产，避免在泛化生成时把重要细节抹平。
+Supertester 不只追求"行为覆盖"，还会显式保护高价值测试资产，避免在泛化生成时把重要细节抹平。
 
-Phase 1 到 Phase 3 会使用 6 类显式特性标签，用来识别那些不能被“正常流程覆盖”替代的测试资产：
+Phase 1 到 Phase 3 会使用 6 类显式特性标签，用来识别那些不能被"正常流程覆盖"替代的测试资产：
 
 - `content_fidelity`
 - `process_feedback`
@@ -226,7 +118,7 @@ flowchart LR
 - `history_interaction_mode`
 - `contract_content_mode`
 
-这套模式解决的是“测什么”和“测到多细”之间的断层问题：
+这套模式解决的是"测什么"和"测到多细"之间的断层问题：
 
 - 列表、本体枚举、矩阵规则不再被随意抽样
 - loading、processing、staged feedback 不再只测最终态
@@ -236,7 +128,7 @@ flowchart LR
 
 ## 审查机制
 
-`agents/test-reviewer.md` 现在不仅看结构正确性，还会执行一层 “High-Fidelity Coverage Radar” 审查，重点检查：
+`agents/test-reviewer.md` 现在不仅看结构正确性，还会执行一层 "High-Fidelity Coverage Radar" 审查，重点检查：
 
 - 内容保真是否被抽象掉
 - 过程态是否只剩最终态验证
@@ -257,7 +149,7 @@ Supertester 不要求所有测试都自动化。它会在 Phase 4 和 Phase 6 �
 - `manual`
 - `missing`
 
-这让最终报告不只回答“写了多少用例”，还会回答“哪些资产能自动化、哪些必须保留人工判断、哪些仍存在缺口”。
+这让最终报告不只回答"写了多少用例"，还会回答"哪些资产能自动化、哪些必须保留人工判断、哪些仍存在缺口"。
 
 ```mermaid
 flowchart TD
@@ -278,19 +170,14 @@ flowchart TD
 ## 仓库结构
 
 ```text
-TestingAgent/
+supertester/
 |-- .claude-plugin/              # Claude Code 插件元数据
-|-- .opencode/                   # OpenCode 适配层与安装说明
-|-- .codex/                      # Codex 安装说明
-|-- .openclaw/                   # OpenClaw 技能目录
-|-- .continue/                   # Continue 技能目录
 |-- agents/                      # 独立审查 agent
 |-- docs/                        # 设计说明、分析报告、安装指南
 |-- hooks/                       # SessionStart / Stop 等流程 hook
 |-- scripts/                     # 初始化与恢复脚本
 |-- skills/                      # Supertester 主流程技能
 |-- templates/                   # .supertester/ 工作文件模板
-|-- AGENTS.md
 |-- CLAUDE.md
 |-- package.json
 `-- README.md
@@ -332,7 +219,7 @@ TestingAgent/
 `-- reports/
 ```
 
-这套目录结构的意义，不只是“把结果写出来”，而是把测试设计过程也保存下来，方便后续恢复、审查和追溯。
+这套目录结构的意义，不只是"把结果写出来"，而是把测试设计过程也保存下来，方便后续恢复、审查和追溯。
 
 ## 组件分工
 
@@ -366,57 +253,9 @@ TestingAgent/
 - 高保真资产丢失
 - 自动化边界误判
 
-## 安装与接入
-
-详细安装指南请参阅 [安装文档](E:/workspace/aise/TestingAgent/docs/installation.md)。
-
-### Claude Code
-
-仓库已包含 Claude 插件元数据：
-
-- [`.claude-plugin/plugin.json`](E:/workspace/aise/TestingAgent/.claude-plugin/plugin.json)
-- [`.claude-plugin/marketplace.json`](E:/workspace/aise/TestingAgent/.claude-plugin/marketplace.json)
-
-本地接入时，确保 `skills/`、`hooks/` 和 `agents/` 能被正确加载。
-
-### OpenCode
-
-OpenCode 适配入口位于 [`.opencode/plugins/supertester.js`](E:/workspace/aise/TestingAgent/.opencode/plugins/supertester.js)，安装说明见 [`.opencode/INSTALL.md`](E:/workspace/aise/TestingAgent/.opencode/INSTALL.md)。
-
-示例配置：
-
-```json
-{
-  "plugin": ["supertester@git+https://github.com/supertester-ai/supertester.git"]
-}
-```
-
-### Codex
-
-Codex 通过原生技能发现机制工作，安装说明见 [`.codex/INSTALL.md`](E:/workspace/aise/TestingAgent/.codex/INSTALL.md)。
-
-### OpenClaw
-
-OpenClaw 支持工作区和全局技能安装，说明见 [`.openclaw/skills/supertester/SKILL.md`](E:/workspace/aise/TestingAgent/.openclaw/skills/supertester/SKILL.md)。
-
-### Continue
-
-Continue 支持项目级别和全局技能安装，说明见 [`.continue/INSTALL.md`](E:/workspace/aise/TestingAgent/.continue/INSTALL.md)。
-
-### 作为规则资产直接复用
-
-如果你不是要直接安装插件，而是想复用这套测试工作流能力，也可以直接复用以下目录：
-
-- `skills/`
-- `hooks/`
-- `templates/`
-- `agents/test-reviewer.md`
-
-这更适合迁移到其他 agent 平台，或在现有测试工作流上做二次封装。
-
 ## 快速开始
 
-接入后，可以直接给 agent 下达自然语言任务，例如：
+安装后，可以直接给 Claude Code 下达自然语言任务，例如：
 
 ```text
 分析 requirements/auth-prd.md，并生成测试方案
@@ -454,10 +293,10 @@ Continue 支持项目级别和全局技能安装，说明见 [`.continue/INSTALL
 
 ## 参考文档
 
-- [安装指南](E:/workspace/aise/TestingAgent/docs/installation.md)
-- [设计说明](E:/workspace/aise/TestingAgent/docs/design.md)
-- [差异分析](E:/workspace/aise/TestingAgent/docs/2026-04-08-comparison.md)
-- [反向优化分析](E:/workspace/aise/TestingAgent/docs/2026-04-09-supertester-optimization-analysis.md)
+- [安装指南](docs/installation.md)
+- [设计说明](docs/design.md)
+- [差异分析](docs/2026-04-08-comparison.md)
+- [反向优化分析](docs/2026-04-09-supertester-optimization-analysis.md)
 
 ## License
 

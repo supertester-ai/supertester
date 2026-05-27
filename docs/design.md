@@ -136,7 +136,7 @@ supertester/
 
 | 决策    | 选择                               | 理由                                              |
 | ----- | -------------------------------- | ----------------------------------------------- |
-| 插件模式  | Superpowers 风格（纯 Markdown Skill） | 零依赖、跨平台（Claude Code/Cursor/OpenCode/Gemini）、开发快 |
+| 插件模式  | Superpowers 风格（纯 Markdown Skill） | 零依赖、面向 Claude Code、开发快                          |
 | 持久化模式 | planning-with-files 3 文件模式       | 经过 96.7% pass rate 验证、会话恢复可靠、防目标漂移              |
 | 行为控制  | Iron Law + Hard Gate + Red Flags | Superpowers 验证过的 prompt 级行为塑造，无需代码              |
 | 质量保证  | 独立 test-reviewer agent           | 生成与审查分离，避免"自证清白"                                |
@@ -1231,7 +1231,7 @@ if action_failed:
 | NFR-1 | 处理长达 10,000 行的需求文档 | 全面解析大型文档                                     |
 | NFR-2 | 支持 monorepo 项目结构   | 多个 package.json 位置                           |
 | NFR-3 | 零代码依赖              | 纯 Markdown skill + Bash 脚本                   |
-| NFR-4 | 跨平台兼容              | Claude Code / Cursor / OpenCode / Gemini CLI |
+| NFR-4 | 仅 Claude Code           | 单平台目标，无跨平台兼容负担                                  |
 | NFR-5 | 所有阶段产出持久化到本地文件     | 可追溯、可审计                                      |
 | NFR-6 | 对话状态持久化            | 支持会话中断和恢复                                    |
 | NFR-7 | 会话恢复后从断点继续         | 不丢失任何已完成的工作                                  |

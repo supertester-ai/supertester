@@ -12,14 +12,8 @@ Thumbs.db
 tmp/
 temp/
 
-# Supertester core
+# Local Claude state
 .claude/
-.claude-plugin/
-.opencode/
-.omx/
-.codex/
-.openclaw/
-.continue/
 
 # Auto-iterate (evaluation tool, not part of core plugin)
 /scripts/auto-iterate/*

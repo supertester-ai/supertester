@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Self-healing: fix executable permissions lost during zip extraction
-chmod +x "${SCRIPT_DIR}/run-hook" "${SCRIPT_DIR}/pre-tool-use" "${SCRIPT_DIR}/post-tool-use" \
+chmod +x "${SCRIPT_DIR}/pre-tool-use" "${SCRIPT_DIR}/post-tool-use" \
          "${SCRIPT_DIR}/session-start" "${SCRIPT_DIR}/stop" "${SCRIPT_DIR}/user-prompt-submit" 2>/dev/null || true
 
 # Escape string for JSON embedding
@@ -45,13 +45,6 @@ fi
 
 session_context="<EXTREMELY_IMPORTANT>\\nYou have supertester powers.\\n\\n**Below is the full content of your 'supertester:using-supertester' skill - your testing workflow guide. For all other skills, use the 'Skill' tool:**\\n\\n${using_supertester_escaped}${recovery_context}\\n</EXTREMELY_IMPORTANT>"
 
-# Output JSON for the appropriate platform
-if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
-  printf '{\n  "additional_context": "%s"\n}\n' "$session_context"
-elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
-  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"
-else
-  printf '{\n  "additionalContext": "%s"\n}\n' "$session_context"
-fi
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"
 
 exit 0
