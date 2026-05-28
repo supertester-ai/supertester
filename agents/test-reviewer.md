@@ -30,6 +30,7 @@ You must produce a structured review record saved to `.supertester/reviews/revie
 
 ### 2. Test Case Quality Review (Phase 3)
 
+- **Self-containment validator (deterministic, MANDATORY):** before any other Phase 3 check, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py" .supertester/test-cases/functional-cases.yaml` and capture both stdout and the exit code. The review verdict MUST be `FAIL` whenever the validator exits non-zero. Paste the validator summary line into the review record's `## Metadata` section as `Self-containment Validator: PASS|FAIL (N violations)`, and lift each reported `(case_id, field, code, snippet)` into the Issues table as a CRITICAL self-containment finding (do not delegate this to the manual self-containment radar — the validator is the source of truth). Reviewer is NOT allowed to write `Verdict: PASS` while violations exist, nor to argue around individual violations on stylistic grounds.
 - **YAML validity:** does `functional-cases.yaml` parse cleanly?
 - **Preconditions:** are they clear and executable?
 - **Steps / rows[].action:** are they unambiguous and followable?
@@ -142,6 +143,12 @@ This is the new P0 review layer. You must actively search for these gaps.
 | **MEDIUM** | Moderate quality issue or useful enhancement | Recommended fix |
 | **LOW** | Minor improvement | Optional |
 
+### Mandatory CRITICAL Classifications
+
+Classify as **CRITICAL** when:
+
+- the self-containment validator (`scripts/check-self-contained.py`) reports any `code-carries-meaning` / `title-empty` / `title-body-too-short` violation against `functional-cases.yaml`. One review record entry per validator violation, citing the `case_id`, `field` and `snippet` from the validator output. Verdict cannot be PASS while these exist.
+
 ### Mandatory HIGH Classifications
 
 Classify as **HIGH** when:
@@ -166,6 +173,7 @@ Classify as **HIGH** when:
 - **Reviewed At:** YYYY-MM-DDTHH:MM:SSZ
 - **Files Reviewed:** [list]
 - **Requirements Baseline:** parsed-requirements.md
+- **Self-containment Validator:** PASS | FAIL (N violations) — Phase 3 only; quote the validator's summary line verbatim
 
 ## Summary
 - **Verdict:** PASS | FAIL (CRITICAL/HIGH issues exist)

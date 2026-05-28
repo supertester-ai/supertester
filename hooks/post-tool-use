@@ -18,6 +18,20 @@ context=""
 
 if [ -d ".supertester" ]; then
     context="<POST-TOOL-REMINDER>\\nYou just wrote/edited a file. Remember to:\\n1. Update progress.md with what you just did\\n2. Update the corresponding phase output file\\n3. Follow the 2-Action Rule: if you've done 2+ operations, update findings.md now\\n</POST-TOOL-REMINDER>"
+
+    # Self-containment validator: run whenever functional-cases.yaml exists.
+    # Surfaces any internal-code-substitution violations as additionalContext
+    # so the agent must see them before advancing past Phase 3.
+    yaml_path=".supertester/test-cases/functional-cases.yaml"
+    script_path="${CLAUDE_PLUGIN_ROOT:-.}/scripts/check-self-contained.py"
+    if [ -f "$yaml_path" ] && [ -f "$script_path" ] && command -v python3 >/dev/null 2>&1; then
+        validator_out=$(python3 "$script_path" "$yaml_path" --limit 30 2>&1 || true)
+        if printf '%s' "$validator_out" | head -1 | grep -q "FAIL"; then
+            warn_escaped=$(escape_for_json "$validator_out")
+            warn_block="<SELF-CONTAINMENT-VIOLATIONS>\\n${warn_escaped}\\n\\nHARD GATE: Phase 3 cannot be declared complete and test-reviewer cannot return PASS while any code-carries-meaning violation remains. Fix each violation by inlining the actual name/copy/state/assumption that the code stands for, then re-run the validator until 0 violations remain. See skills/test-case-generation/SKILL.md '用例自包含原则' for the rule.\\n</SELF-CONTAINMENT-VIOLATIONS>"
+            context="${context}\\n${warn_block}"
+        fi
+    fi
 fi
 
 printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PostToolUse",\n    "additionalContext": "%s"\n  }\n}\n' "$context"

@@ -269,6 +269,16 @@ description: Use when generating functional test cases from confirmed requiremen
   - **例外**：`feature` / `sub_refs` / `sources` 三个纯溯源字段允许直接放代号，不参与本自检
   - **执行约束**：本自检需在每个模块全部用例生成后立即执行，不允许带着违规代号进入 Step 3 去重；违规项必须**逐字段修复**后再进入下一步，且修复不允许仅删除代号——必须补全代号背后的实际语义
 违规项立即修正后再进入 Step 3 去重
+- **确定性校验器闸门（强制 HARD GATE）**: LLM 的自检已被多次证明会漂移；本规则不再依赖你自己扫描代号，而是**强制执行**插件根目录下的 `scripts/check-self-contained.py`。每次写完或修改 `.supertester/test-cases/functional-cases.yaml` 后必须立刻运行：
+  ```bash
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py" .supertester/test-cases/functional-cases.yaml
+  ```
+  - 退出码 `0` = 0 处违规，可进入 Step 3 去重
+  - 退出码 `1` = 仍有违规，**禁止进入 Step 3**，必须按校验器输出的 `field` + `snippet` 逐项修复，再重跑直到退出码 `0`
+  - 退出码 `2` = 文件缺失或 YAML 解析失败，先修复语法或路径再重跑
+  - PostToolUse hook 也会在每次 Write/Edit 后自动执行该校验器并把违规清单作为 `<SELF-CONTAINMENT-VIOLATIONS>` 注入上下文——看到该块代表当前文件不符合自包含规则，立即修复，不允许声明 Phase 3 完成、不允许把文件提交给 test-reviewer
+  - 修复方式：在违规字段中把代号背后的**实际中文名/逐字文案/状态语义/假设描述**内嵌进去；代号降级为括号注释（合法形态：`「请填写手机号」(C-004)` / `已提醒过中文名提示标志(S-001) = false` / `(实际内容，CMS-001)`）
+  - 不允许通过删除代号"绕过"违规——必须补全语义；不允许把 functional-cases.yaml 拆成多个文件来绕过校验
 - **优先级标注自检（强制）**: 生成完每个模块的全部用例后，逐条检查每条用例是否有 `priority` 字段且取值 ∈ {`P0`, `P1`, `P2`}。命中以下任一情况视为缺陷，立即修正后再进入 Step 3 去重：
   - 字段缺失或为空 → 按"优先级分级规则"判定后补齐
   - 取值不在枚举内（例如 `P3` / `high` / `1`）→ 修正为合法枚举
@@ -619,6 +629,9 @@ cases:
 | "支付/鉴权用例先标 P1，后面再升 P0" | 安全/资金/数据完整性默认 P0，不允许默认降级；这条用例的 priority 在生成时就要写对 |
 | "matrix 某条罕见 row 比父级更关键，标更高优先级" | row 不允许升档（拆为独立 single 用例承载更高优先级），否则父级 priority 失去聚合语义 |
 | "priority 让 reviewer 加就行了" | 生成阶段必须自带 priority；reviewer 只核验是否合理，不负责补字段 |
+| "自包含规则我自己扫一遍就行" | LLM 自检已被多次证明会漂移；`scripts/check-self-contained.py` 是唯一权威。退出码不为 0 时不允许进入 Step 3、不允许提交给 reviewer、不允许 Stop |
+| "校验器报的这条不算真违规，跳过" | 校验器是确定性规则的执行者，不接受个例豁免。要么按规则补全语义，要么把代号挪到 `feature` / `sub_refs` / `sources` 三个纯溯源字段 |
+| "把校验器输出删掉就过了" | hook 会在每次 Write/Edit 后重跑校验并重新注入违规清单；Stop hook 也会基于文件实际内容阻塞，不读注释 |
 
 ## 本阶段完成标准
 
@@ -630,4 +643,5 @@ cases:
 - 同字段/同规则多分区已聚合为 `type: matrix`，不存在零散派生的 single 群
 - 每条用例都显式标注 `priority` 且取值 ∈ {P0, P1, P2}；每个 F-xxx 至少有 1 条 P0；安全/鉴权/资金/数据完整性场景已落到 P0；模块内不存在全档一致（除 findings.md 已记录理由的特例）
 - `functional-cases.yaml` 通过 YAML 语法校验，且 meta.priority_distribution / priority_row_distribution 与实际用例分布一致
+- **`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py .supertester/test-cases/functional-cases.yaml` 退出码为 0**（0 处自包含违规）。任何 `code-carries-meaning` / `title-empty` / `title-body-too-short` 命中都会让 PostToolUse hook 在 `<SELF-CONTAINMENT-VIOLATIONS>` 块中持续提示、并让 Stop hook 阻塞工作流终止，必须先内嵌代号背后的实际语义再重跑校验
 - reviewer 已确认不存在明显的覆盖维度缺口
