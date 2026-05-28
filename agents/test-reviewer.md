@@ -37,6 +37,13 @@ You must produce a structured review record saved to `.supertester/reviews/revie
 - **Traceability:** does each `TC-xxx` correctly reference source `F-xxx`? For matrix cases, does **every row** carry a non-empty `source` field?
 - **Generator Selection:** was the right sub-generator chosen?
 - **Deduplication:** were duplicates removed without deleting important coverage?
+- **Priority (P0/P1/P2):** every case MUST have `priority` ∈ {P0, P1, P2}. Check the following — see `test-case-generation/SKILL.md` "优先级分级规则" for the rubric:
+  - Missing or invalid `priority` value → **HIGH**
+  - Each `F-xxx` must have ≥1 P0 case covering its core success path → missing **HIGH**
+  - Security / auth / payment / data-integrity / irreversible-operation cases marked P1/P2 without a documented reason in `findings.md` → **HIGH** (these default to P0)
+  - All cases in a module share the same priority (e.g., all P1) without a documented reason → **HIGH** (priority distribution must reflect business impact × likelihood)
+  - Matrix row `priority` higher than the parent's, or `branches[].priority` higher than the parent scenario_chain's → **MEDIUM** (split out as a separate `single` case instead, or lower the row/branch level)
+  - `meta.priority_distribution` / `meta.priority_row_distribution` does not match the actual case counts → **MEDIUM**
 
 ### 2a. Matrix Aggregation Review (Phase 3) — NEW P0
 

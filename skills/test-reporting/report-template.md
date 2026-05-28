@@ -4,6 +4,7 @@
 - **Generated:** YYYY-MM-DD
 - **Requirement Doc:** [filename]
 - **Total Test Cases:** N
+- **Priority Mix:** P0 = a (X%) / P1 = b (Y%) / P2 = c (Z%)
 - **Automation Rate:** X%
 - **Review Status:** [summary]
 - **Coverage Summary:** [one-sentence summary of behavior and evidence coverage]
@@ -50,9 +51,33 @@
 
 | TC ID | Name | Generator | Fidelity Modes | Priority |
 |-------|------|-----------|----------------|----------|
-| TC-001 | [name] | Equivalence | content_fidelity_mode | High |
+| TC-001 | [name] | Equivalence | content_fidelity_mode | P0 |
+
+Priority values must be `P0` / `P1` / `P2` taken directly from `functional-cases.yaml`. Do not invent alternative labels (High/Medium/Low).
 
 **Total by module:** N test cases
+
+## Priority Distribution
+
+| Level | Case Count | Case % | Row Count (incl. matrix rows) | Row % |
+|-------|-----------|--------|-------------------------------|-------|
+| P0 | N | X% | N' | X% |
+| P1 | N | X% | N' | X% |
+| P2 | N | X% | N' | X% |
+
+### P0 Cases (must-fix-before-release)
+
+| TC ID | Module | Title | Automation | Coverage |
+|-------|--------|-------|------------|----------|
+| TC-001 | [module] | [title] | automatable | covered |
+
+### Priority × Automation Cross-Tab
+
+| | automatable | partial | manual |
+|---|---|---|---|
+| P0 | a | b | c |
+| P1 | d | e | f |
+| P2 | g | h | i |
 
 ## Automation Analysis
 

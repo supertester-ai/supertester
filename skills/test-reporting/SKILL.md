@@ -95,6 +95,20 @@ For each `F-xxx`, `IR-xxx`, and `CMS-xxx`, report:
 
 Always report both. A report that only shows case count understates true coverage breadth when matrix cases exist; a report that only shows execution-point count understates the conceptual case count and inflates apparent automation density.
 
+### 1b. Priority (P0/P1/P2) Reporting
+
+Priority comes directly from `functional-cases.yaml`. The report MUST surface it explicitly — counts alone (e.g. "total = 80") tell users nothing about release risk.
+
+Required:
+
+- Top-line `Priority Mix` in Executive Summary (P0 / P1 / P2 percentages at both case and row scales)
+- A dedicated `Priority Distribution` section with case-count and row-count breakdowns
+- A P0 case list with module + title + automation level (this is the "must-fix-before-release" inventory users will scan first)
+- A Priority × Automation cross-tab (small 3×3) — surfaces e.g. "5 P0 cases are manual" which is a release-readiness signal
+- The Traceability Matrix and per-module case tables MUST carry a Priority column with literal P0/P1/P2 (not High/Medium/Low)
+
+Do NOT recompute or reclassify priority. If a case is missing `priority` upstream, flag it as a Phase 3 defect rather than guessing a value here.
+
 ### 2. Coverage Dimensions
 
 At minimum, evaluate:

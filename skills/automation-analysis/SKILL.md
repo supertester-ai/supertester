@@ -103,10 +103,13 @@ meta:
     automatable: X'
     partial: Y'
     manual: Z'
+  # priority_distribution 与 priority_row_distribution 直接透传自 functional-cases.yaml 的 meta，
+  # 不在本阶段重新分配；automation 与 priority 是正交维度
 
 cases:
   - id: TC-001
     type: single
+    priority: P0                 # 透传自 functional-cases.yaml，不得修改
     automation: automatable
     rationale: 全部步骤为 DOM 操作 + URL 断言
     auto_steps: all
@@ -114,11 +117,13 @@ cases:
 
   - id: TC-043
     type: matrix
+    priority: P1                 # 透传父级 priority
     automation: partial           # 父级聚合后结果
     rationale: IP 模拟分组需 partial；其余 row 可自动化
     rows:
       - group: IP 归属 → 默认区号
         index: 0
+        priority: P2              # 透传 row 级覆盖（若上游有）
         automation: partial
         rationale: 需 IP 归属地模拟工具
       - group: 长度 × 区号
@@ -132,11 +137,17 @@ cases:
 
   - id: TC-020
     type: single
+    priority: P1
     automation: manual
     rationale: 需接收实际邮件并验证内容
     auto_steps: []
     manual_steps: all
 ```
+
+**优先级透传规则**：
+- 本阶段**不重新分配 priority**，只忠实透传 functional-cases.yaml 的字段（case 级与 row 级）
+- 如果上游 priority 缺失，应停止分析并要求 Phase 3 补齐，而不是在本阶段补默认值
+- automation 与 priority 是**正交维度**：P0 用例完全可能是 manual（如人工视觉验收），P2 用例也可能是 automatable；不允许因为 priority=P0 就强行把 manual 改为 automatable，反之亦然
 
 ### automation-analysis.md（人审视图）
 

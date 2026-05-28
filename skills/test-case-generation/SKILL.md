@@ -22,6 +22,9 @@ description: Use when generating functional test cases from confirmed requiremen
 > **用例必须完全自包含，禁止以任何内部代号替代实际内容。**
 > 任何阅读者（人工执行者、自动化脚本作者、外部测试管理系统）都应能仅凭一条用例本身判断它要做什么、要看什么——不需要回查 `parsed-requirements.md`、`cross-module-scenarios.md`、`implicit-requirements.md` 或任何其他文档。`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 字段中**不得用代号承担内容**：代号只允许作为括号注释附在实际内容之后（用于溯源），或出现在 `feature` / `sub_refs` / `sources` 三个纯溯源字段中。`title` 中尤其禁止把多个代号串成括号尾巴当作标题主体。任何"S-003 仍为 true""观察 F-005/F-006/F-007 字段""按 A-7 假设"这类写法视为用例不可独立执行，列为 CRITICAL 级问题。
 
+> **每条用例必须显式标注优先级（P0 / P1 / P2），不得留空、不得"全部 P1"一刀切。**
+> 优先级反映"该测试失败时的业务影响 × 触发概率"。**P0 = 阻塞级**（核心主流程、安全、资金、数据完整性、关键契约——失败即影响发布）；**P1 = 重要级**（关键校验、常用异常路径、集成失败处理、主语言文案、关键状态转换——失败即明显缺陷）；**P2 = 次要级**（罕见边界、长尾组合、纯视觉细节、低流量平台/语言、加固型用例——失败可延后修复）。每个功能至少有 1 条 P0 用例覆盖其核心成功路径；任何缺失 `priority` 或将全部用例标为同一等级的产出，视为优先级分级缺失，列为 HIGH 级问题。
+
 <HARD-GATE>
 在用户确认功能用例之前，不准进入 automation-analysis 阶段。
 用例未经 test-reviewer 审查之前，不准提交给用户确认。
@@ -157,11 +160,31 @@ description: Use when generating functional test cases from confirmed requiremen
 - `type`: `single` | `matrix` | `scenario_chain`
 - `module`: 所属模块
 - `feature`: 功能 ID (F-xxx)，可附 `sub_refs: [E-xxx, I-xxx]`
+- `priority`: 优先级，从枚举选择，不得留空。枚举值：`P0` / `P1` / `P2`（语义见下方"优先级分级规则"）
 - `verification_method`: 验证方式（从枚举选择，不得留空。枚举值：`ui_text_assertion` / `ui_attribute_assertion` / `api_response_assertion` / `url_assertion` / `storage_assertion` / `screenshot_comparison` / `manual_visual_check` / `log_event_assertion` / `toast_alert_assertion` / `schema_assertion`）
 - `evidence_types`: 列表，从 UI / API / DB / Event / File / Message / Log / Metrics / External 中选择 ≥1 项
 - `automation`: `automatable` | `partial` | `manual`
 - `preconditions`: 共享前置条件列表
 - `key_assets`: 关键资产说明列表（含逐字文案/规则枚举/集成契约引用）；无则写 `[]`
+
+#### 优先级分级规则（P0 / P1 / P2）
+
+**判定模型**：优先级 = 业务影响 × 触发概率。当一条用例的业务影响和触发概率分别落在不同档时，取**更高档**（保守原则）。
+
+| 级别 | 含义 | 典型场景 | 判定关键词 |
+|------|------|---------|-----------|
+| **P0** | 阻塞级 / Blocker：失败即影响发布或导致严重事故 | 核心主流程 happy path / 资金交易与扣费 / 数据完整性与幂等 / 鉴权与权限 / 注入与越权 / 关键合规 / 跨模块关键状态契约 / 生产事故复现回归 | 不修不能发、影响所有用户、涉钱、涉权限、涉数据丢失 |
+| **P1** | 重要级 / Major：失败即明显缺陷，多数情况下必须修复 | 关键输入校验规则本身 / 主要替代路径与错误恢复 / 主要语言文案与文案级断言 / 关键状态转换与中断恢复 / 集成失败/超时/降级处理 / 品牌关键区域视觉验收 / 主流终端/浏览器/分辨率 / 中等流量异常 | 影响一类用户或一个关键流程、有清晰可见的功能损坏 |
+| **P2** | 次要级 / Minor：失败时业务影响有限，可延后修复 | 罕见边界值组合 / 长尾分区在 matrix 中的稀疏 row / 次要语言或地区文案的非主路径 / 低流量平台或浏览器 / 纯视觉细节（间距、字号微差） / 加固性用例（DOS 防护、模糊输入） / 已知低概率组合 | 触发条件苛刻、视觉/体验类、用户可绕开 |
+
+**强制规则**：
+1. **每个功能至少 1 条 P0**：每个 `F-xxx` 的核心成功路径必须有至少 1 条 `priority: P0` 用例。如果一个功能的主流程已被某个 `scenario_chain` 覆盖，则该 `scenario_chain` 即为 P0 候选
+2. **安全/资金/数据完整性默认 P0**：以下场景一律 P0，不允许降级——鉴权（登录/登出/会话）、权限校验、注入与越权、支付与扣费、订单与库存、数据写入与幂等、不可逆操作（删除/转移/解绑）
+3. **多语言交叉**：主语言（默认语言）下的错误文案断言 ≥ P1；次要语言下的错误文案断言可为 P2。但**关键操作**（鉴权、支付）下任一语言的错误文案均 ≥ P1
+4. **matrix row 优先级**：父用例的 `priority` 表示该矩阵的总体级别；行内可通过 `priority` 字段单独覆盖（例如父级 P1，某条罕见组合 row 标 P2；父级 P0，某条加固性 row 标 P1）。覆盖时**不允许升档**——row 优先级不得高于父级（如需高于父级，应拆为独立 `single` 用例）
+5. **scenario_chain 中 branch**：父用例 `priority` 表示主路径级别；`branches[].priority` 可单独覆盖错误恢复或替代路径的级别
+6. **禁止全档一致**：单个功能下若所有用例同档（例如全 P1），视为未做分级，列为 HIGH 级问题。少数特例（如纯校验规则集功能只有 P1）需在 findings.md 记录理由
+7. **理由可溯源**：在 findings.md 中按模块记录优先级分布的判定理由（哪些被认定 P0、为什么；哪些降级为 P2、依据是什么），不要求逐条记录，但要求记录"关键档位决策"
 
 #### type 决定下层结构
 
@@ -181,6 +204,7 @@ description: Use when generating functional test cases from confirmed requiremen
       verbatim: true   # 可选；标记 expected 中引号内文案需逐字断言
       status: blocked  # 可选；blocked / inferred；表示推测或被阻塞
       automation: manual  # 可选；row 级覆盖父用例的 automation
+      priority: P2     # 可选；row 级覆盖父用例的 priority，且不得高于父级
     ```
   - **5-step ceiling**: 单个 row 的 `action` 不允许超过 5 个编号步骤；超出表明应升级为独立 `single` 用例
 
@@ -188,7 +212,7 @@ description: Use when generating functional test cases from confirmed requiremen
 - `steps`: 步骤列表（同 single）
 - `expected`: 预期结果列表
 - `sources`: 溯源数组
-- 可选 `branches`: 替代路径或错误恢复路径数组，每项含 `name` + `steps` + `expected`
+- 可选 `branches`: 替代路径或错误恢复路径数组，每项含 `name` + `steps` + `expected`，可选 `priority`（覆盖父级，不得高于父级）
 
 如果功能包含关键测试资产，至少满足以下规则：
 - **内容资产**: 用例中写出要校验的关键内容类型，不得只写"内容正确"。当需求文档中提供了具体文案、标签或格式要求时，用例的预期结果必须包含字符串级断言（如具体文案文本、格式模板），不能停留在"显示正确"或"文案符合预期"。**禁止文档引用替代**：预期结果中不得以"见 XX 文档 §X.X""参照需求文档""具体文案见设计稿"等外部引用替代实际内容——用例必须自包含，审查者和自动化脚本无需回查任何外部文档即可判断预期是否满足。如果原始文案内容较长、不适合完整内嵌，在用例预期结果中至少内嵌可唯一标识该文案的关键片段（如首句 + 末句 + 核心约束段），并以附录形式保留全文作为断言基准
@@ -245,6 +269,14 @@ description: Use when generating functional test cases from confirmed requiremen
   - **例外**：`feature` / `sub_refs` / `sources` 三个纯溯源字段允许直接放代号，不参与本自检
   - **执行约束**：本自检需在每个模块全部用例生成后立即执行，不允许带着违规代号进入 Step 3 去重；违规项必须**逐字段修复**后再进入下一步，且修复不允许仅删除代号——必须补全代号背后的实际语义
 违规项立即修正后再进入 Step 3 去重
+- **优先级标注自检（强制）**: 生成完每个模块的全部用例后，逐条检查每条用例是否有 `priority` 字段且取值 ∈ {`P0`, `P1`, `P2`}。命中以下任一情况视为缺陷，立即修正后再进入 Step 3 去重：
+  - 字段缺失或为空 → 按"优先级分级规则"判定后补齐
+  - 取值不在枚举内（例如 `P3` / `high` / `1`）→ 修正为合法枚举
+  - 某 `F-xxx` 功能下没有任何 `priority: P0` 用例 → 回查该功能的核心成功路径用例，将其升档为 P0；若该功能本身不存在核心成功路径用例（仅有规则校验/异常路径），在 findings.md 记录理由并将最贴近主流程的用例升为 P0
+  - 安全/鉴权/资金/数据完整性/不可逆操作场景的用例标为 P1 或 P2 → 升档为 P0（除非有明确理由，并在 findings.md 记录）
+  - 模块内所有用例同档（例如全 P1）→ 重新按"业务影响 × 触发概率"分布；若确实无法分散（如纯校验规则集），在 findings.md 记录理由
+  - matrix row 的 `priority` 高于父级 → 拆为独立 `single` 用例（参见"matrix row 粒度自检"思路），或将该 row 降到父级以下
+  - scenario_chain 的 `branches[].priority` 高于主链 `priority` → 同上处理
 生成时优先遵循：
 - 精准覆盖优于平均铺开
 - 可验证优于抽象描述
@@ -345,6 +377,12 @@ description: Use when generating functional test cases from confirmed requiremen
   - 每个"视觉验收项"是否有对应的独立用例，且验证方式显式标注为 `manual_visual_check` 或 `screenshot_comparison`？
   - 每个"合约/规则项"是否有专门的规则级验证用例（验证规则配置本身的正确性），而非仅被行为用例间接覆盖？
   - 任何未覆盖项标记为 CRITICAL 级别问题，要求补充后才能通过审查
+- **优先级分级核验（强制）**：逐条检查 `priority` 字段是否存在且 ∈ {P0, P1, P2}；以模块为粒度核查以下规则——
+  - 每个 `F-xxx` 是否至少有 1 条 P0 用例覆盖其核心成功路径？缺失 → **HIGH**
+  - 安全/鉴权/资金/数据完整性/不可逆操作场景的用例是否标为 P0？标为 P1/P2 且 findings.md 无理由 → **HIGH**
+  - 是否存在某模块所有用例同档（全 P0 / 全 P1 / 全 P2）？同档 → **HIGH**（除非 findings.md 有明确理由）
+  - matrix row / scenario_chain branches 是否存在 row/branch 优先级高于父级？存在 → **MEDIUM**，要求拆为独立 single 或降到父级以下
+  - 行级覆盖后的有效优先级分布是否在 meta.priority_row_distribution 中反映准确？不准确 → **MEDIUM**
 - **用例自包含独立性核验（强制）**：随机抽样至少 30% 的用例（含 single / matrix / scenario_chain 各至少 3 条），按"假装从未读过任何需求文档"的视角逐条阅读 `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions`。命中以下任一情况即标记 CRITICAL 级问题：
   - `title` 主体（括号外的部分）无法独立表达验证目标，需要回查代号才能理解（例如 "首次未提交退出后首次标志持久性"——"首次标志"未交代是什么标志）
   - 任一字段中存在代号承担语义主体的写法：`expected: C-005` / `steps: 观察 F-005/F-006/F-007 字段` / `preconditions: 该账号 S-003 = true` / `key_assets: [S-003 持久性 (A-7 BLOCKED)]` 等
@@ -360,6 +398,7 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 向用户展示：
 - **用例统计**：原始候选数 vs 聚合/去重后用例数 vs 执行点数（matrix rows + single + scenario_chain steps 合计）
 - **按 type 分类**：single 数 / matrix 数（含 group/row 分布）/ scenario_chain 数
+- **按优先级分类**：P0 / P1 / P2 各档数量（按 type 维度），以及行级覆盖后的有效优先级分布；按模块给出 P0 用例清单（用户最关心阻塞级）
 - 按模块分组的用例列表（含矩阵聚合摘要）
 - 审查结果摘要
 
@@ -385,6 +424,14 @@ meta:
   module: <模块名>
   total_cases: <用例数 N>      # type 维度总数
   total_rows: <执行点数 M>     # matrix rows + single + scenario_chain 之和
+  priority_distribution:       # 按 type 维度统计；matrix/scenario_chain 以父级 priority 计入
+    P0: <数量>
+    P1: <数量>
+    P2: <数量>
+  priority_row_distribution:   # 按执行点维度统计（含 matrix rows 与 branches 覆盖后的有效优先级）
+    P0: <数量>
+    P1: <数量>
+    P2: <数量>
   dedup_report: deduplication-report.md
   generated_at: YYYY-MM-DD
 
@@ -403,6 +450,7 @@ cases:
   module: 免费会员信息确认
   feature: F-003
   sub_refs: [CMS-001, CL-012]
+  priority: P0    # 数据完整性 + 跨模块状态契约 → 阻塞级
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
   automation: automatable
@@ -430,6 +478,7 @@ cases:
   type: matrix
   module: 免费会员信息确认
   feature: F-005
+  priority: P1             # 父级；输入校验关键规则集 → 重要级；row 可单独降档
   verification_method: ui_text_assertion
   evidence_types: [UI, External]
   automation: partial      # 父级；row 可单独覆盖
@@ -458,6 +507,7 @@ cases:
           expected: 默认 "+86"（推测）
           source: IR-009
           status: blocked
+          priority: P2   # 罕见且推测 → 降为次要级
 
     - name: 长度 × 区号
       rows:
@@ -502,6 +552,7 @@ cases:
   module: 免费会员信息确认
   feature: F-003
   sub_refs: [CMS-020]
+  priority: P0    # 数据完整性 + 不可逆写入幂等 → 阻塞级
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
   automation: partial
@@ -523,6 +574,7 @@ cases:
     - 提交操作幂等性契约：相同手机号变更请求多次到达后端，只产生一次写入（对应 CMS-020）
   branches:
     - name: 网络恢复后提交失败
+      priority: P1   # 错误恢复分支；可低于主链 P0
       steps:
         - 网络恢复但服务端返回 5xx
       expected:
@@ -538,6 +590,7 @@ cases:
 4. **`status: blocked`** 的 row 表示需求未明确或被阻塞，必须配合 `source` 指向 IR-xxx 或 findings.md 中的待澄清记录
 5. **逐字断言不可代号化**：`expected: C-005` 是错误写法，必须写 `expected: 逐字显示「请填写正确的手机号」(C-005)`
 6. **`groups[].name` 必须有业务语义**，不允许写 "分组1" "分组2" —— 应当反映分组维度（如 "IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
+7. **`priority` 字段必填且取值受限**：每条用例（single / matrix / scenario_chain）必须显式写 `priority`，取值只能是 `P0` / `P1` / `P2`；matrix row 的 `priority` 与 scenario_chain branches 的 `priority` 可选但不得高于父级；不允许出现 `P3` / `high` / `1` / `Blocker` 等非枚举值
 
 ## 2-Action Rule 落地
 
@@ -562,6 +615,10 @@ cases:
 | "title 后面跟一串 (CMS-024 / IR-038 / A-7) 看起来很专业" | 标题主体必须独立成句，删掉括号后依然要交代清楚验证什么业务行为；纯代号串无法告诉执行者用例意图 |
 | "步骤里写 'F-005/F-006/F-007 字段' 更精简" | 执行者不会回查需求才点开页面；字段必须写中文名（"姓名/出生年月/性别"），代号只作括号注释 |
 | "S-003/A-7 是项目内部公认的简写" | 用例的目标读者还包括外部测试管理系统、新加入的执行者、未来的自动化脚本作者；任何代号都不是"公认"的 |
+| "全部标 P1 最稳妥" | 全档一致 = 未做分级，列为 HIGH 问题；执行团队拿不到"先跑哪条"的信号 |
+| "支付/鉴权用例先标 P1，后面再升 P0" | 安全/资金/数据完整性默认 P0，不允许默认降级；这条用例的 priority 在生成时就要写对 |
+| "matrix 某条罕见 row 比父级更关键，标更高优先级" | row 不允许升档（拆为独立 single 用例承载更高优先级），否则父级 priority 失去聚合语义 |
+| "priority 让 reviewer 加就行了" | 生成阶段必须自带 priority；reviewer 只核验是否合理，不负责补字段 |
 
 ## 本阶段完成标准
 
@@ -571,5 +628,6 @@ cases:
 - 多证据类型功能已体现多观测面验证
 - 复杂组合规则已通过 `scenario_chain` 或 `matrix` 方式保留
 - 同字段/同规则多分区已聚合为 `type: matrix`，不存在零散派生的 single 群
-- `functional-cases.yaml` 通过 YAML 语法校验
+- 每条用例都显式标注 `priority` 且取值 ∈ {P0, P1, P2}；每个 F-xxx 至少有 1 条 P0；安全/鉴权/资金/数据完整性场景已落到 P0；模块内不存在全档一致（除 findings.md 已记录理由的特例）
+- `functional-cases.yaml` 通过 YAML 语法校验，且 meta.priority_distribution / priority_row_distribution 与实际用例分布一致
 - reviewer 已确认不存在明显的覆盖维度缺口
