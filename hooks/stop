@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Stop hook for supertester plugin
 # When phases are incomplete, block stop and tell Claude why (via decision/reason).
-# When all phases complete or no plan exists, allow stop with empty output.
+# When all required phases complete or no plan exists, allow stop with empty output.
+#
+# Respects `## Max Phase` in test_plan.md:
+#   - "Phase N"  -> only phases 1..N are required
+#   - empty/missing -> all phases are required
 
 set -euo pipefail
 
@@ -26,15 +30,58 @@ TOTAL="${TOTAL:-0}"
 COMPLETE=$(grep -c 'Status:\*\* complete' ".supertester/test_plan.md" 2>/dev/null | tr -d '[:space:]' || true)
 COMPLETE="${COMPLETE:-0}"
 
-# All complete -> allow stop
-if [ "$TOTAL" -gt 0 ] && [ "$TOTAL" -eq "$COMPLETE" ]; then
+# Extract Max Phase value (first `Phase N` outside HTML comments under `## Max Phase`).
+MAX_PHASE=$(awk '
+  BEGIN { in_section=0; in_comment=0 }
+  /^## Max Phase[[:space:]]*$/ { in_section=1; next }
+  in_section && /^## / { exit }
+  {
+    if (!in_section) next
+    line = $0
+    while (1) {
+      if (in_comment) {
+        p = index(line, "-->")
+        if (p > 0) { line = substr(line, p+3); in_comment = 0 }
+        else { line = ""; break }
+      } else {
+        s = index(line, "<!--")
+        if (s > 0) {
+          rest = substr(line, s+4)
+          e = index(rest, "-->")
+          if (e > 0) { line = substr(line, 1, s-1) substr(rest, e+3) }
+          else { line = substr(line, 1, s-1); in_comment = 1; break }
+        } else { break }
+      }
+    }
+    if (match(line, /Phase[[:space:]]+[0-9]+/)) {
+      v = substr(line, RSTART, RLENGTH)
+      gsub(/[^0-9]/, "", v)
+      if (v != "") { print v; exit }
+    }
+  }
+' ".supertester/test_plan.md" 2>/dev/null || true)
+MAX_PHASE="${MAX_PHASE:-0}"
+
+# Decide required phase count: Max Phase if set, otherwise TOTAL.
+if [ "$MAX_PHASE" -gt 0 ]; then
+    REQUIRED="$MAX_PHASE"
+else
+    REQUIRED="$TOTAL"
+fi
+
+# Required phases satisfied -> allow stop
+if [ "$REQUIRED" -gt 0 ] && [ "$COMPLETE" -ge "$REQUIRED" ]; then
     printf '{}\n'
     exit 0
 fi
 
 # Incomplete -> block with reason
 incomplete=$(grep -B2 '^\- \*\*Status:\*\* \(pending\|in_progress\)' ".supertester/test_plan.md" 2>/dev/null | grep "### Phase" || echo "unknown")
-reason="Supertester workflow incomplete: only ${COMPLETE}/${TOTAL} phases done. Incomplete: ${incomplete}. Continue working or ask the user to confirm early stop."
+if [ "$MAX_PHASE" -gt 0 ]; then
+    reason="Supertester workflow incomplete: ${COMPLETE}/${REQUIRED} required phases done (Max Phase = Phase ${MAX_PHASE}, total ${TOTAL}). Incomplete: ${incomplete}. Continue working or ask the user to confirm early stop."
+else
+    reason="Supertester workflow incomplete: only ${COMPLETE}/${TOTAL} phases done. Incomplete: ${incomplete}. Continue working or ask the user to confirm early stop."
+fi
 reason_escaped=$(escape_for_json "$reason")
 
 printf '{\n  "decision": "block",\n  "reason": "%s"\n}\n' "$reason_escaped"
