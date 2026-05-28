@@ -19,6 +19,9 @@ description: Use when generating functional test cases from confirmed requiremen
 > **同字段/同规则下的多分区必须聚合为 matrix 用例，不准平铺为独立 TC。**
 > 当满足同字段（或同规则集）+ 同验证方式 + 同证据类型 + 共享前置条件 + 仅"输入条件 → 预期结果"维度变化 + 候选 ≥3 条时，必须输出为单条 `type: matrix` 用例 + 分组矩阵（`groups[].rows[]`），公共元数据只写一次。平铺为 18 条仅"条件→预期"差异的独立 TC 视为零散派生 (sprawling)，列为 HIGH 级问题。
 
+> **用例必须完全自包含，禁止以任何内部代号替代实际内容。**
+> 任何阅读者（人工执行者、自动化脚本作者、外部测试管理系统）都应能仅凭一条用例本身判断它要做什么、要看什么——不需要回查 `parsed-requirements.md`、`cross-module-scenarios.md`、`implicit-requirements.md` 或任何其他文档。`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 字段中**不得用代号承担内容**：代号只允许作为括号注释附在实际内容之后（用于溯源），或出现在 `feature` / `sub_refs` / `sources` 三个纯溯源字段中。`title` 中尤其禁止把多个代号串成括号尾巴当作标题主体。任何"S-003 仍为 true""观察 F-005/F-006/F-007 字段""按 A-7 假设"这类写法视为用例不可独立执行，列为 CRITICAL 级问题。
+
 <HARD-GATE>
 在用户确认功能用例之前，不准进入 automation-analysis 阶段。
 用例未经 test-reviewer 审查之前，不准提交给用户确认。
@@ -189,11 +192,28 @@ description: Use when generating functional test cases from confirmed requiremen
 
 如果功能包含关键测试资产，至少满足以下规则：
 - **内容资产**: 用例中写出要校验的关键内容类型，不得只写"内容正确"。当需求文档中提供了具体文案、标签或格式要求时，用例的预期结果必须包含字符串级断言（如具体文案文本、格式模板），不能停留在"显示正确"或"文案符合预期"。**禁止文档引用替代**：预期结果中不得以"见 XX 文档 §X.X""参照需求文档""具体文案见设计稿"等外部引用替代实际内容——用例必须自包含，审查者和自动化脚本无需回查任何外部文档即可判断预期是否满足。如果原始文案内容较长、不适合完整内嵌，在用例预期结果中至少内嵌可唯一标识该文案的关键片段（如首句 + 末句 + 核心约束段），并以附录形式保留全文作为断言基准
-- **用例自包含原则（强制）**: 一条用例必须能脱离 `parsed-requirements.md` 独立执行和入库。`action` / `expected` / `key_assets` / `preconditions` 字段中**不得用内部代号替代实际内容**。内部代号包括但不限于 `C-xxx`（文案码）、`E-xxx`（枚举码）、`IR-xxx`（隐含需求码）、`CMS-xxx`（跨模块场景码）、`CL-xxx`（澄清码）、`I-xxx`（事项码）、`CTX-X`（上下文码）。规则：
-  - **错误示例**：`expected: 显示 C-005` / `key_assets: [C-004, E-001]` / `preconditions: [CTX-B]`
-  - **正确示例**：`expected: 错误提示显示「请填写正确的手机号」(对应 C-005)` / `key_assets: [必填文案「请填写手机号」逐字断言, 区号默认值映射完整枚举（大陆/国外→+86，香港→+852，澳门→+853，台湾→+886）]` / `preconditions: [用户已登录且开通会员，进入信息确认页（>90天首次确认路径，CTX-B）]`
-  - **代号位置**：内部代号只允许出现在 `feature` / `sub_refs` / `sources` 三个**纯溯源字段**中作为机器索引；以及在内容字段中作为**括号注释**附在实际内容之后（不得替代内容）
+- **用例自包含原则（强制）**: 一条用例必须能脱离 `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md` 等任何外部文档独立执行和入库。`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 字段中**不得用内部代号替代实际内容**。内部代号包括但不限于：
+  - 文案/枚举类：`C-xxx`（文案码）、`E-xxx`（枚举码）
+  - 需求/场景类：`IR-xxx`（隐含需求码）、`CMS-xxx`（跨模块场景码）、`CL-xxx`（澄清码）、`I-xxx`（事项码）
+  - 功能/特性类：`F-xxx`（功能码）、`R-xxx`（规则码）、`UC-xxx`（用例码）
+  - 状态/假设类：`S-xxx`（状态/标志码）、`A-xxx`（假设码）、`PR-xxx`（前置条件码）
+  - 上下文/路径类：`CTX-X`（上下文码）、`P-xxx`（路径码）、`SC-xxx`（场景码）
+  - 任何形如 `<1-3 个大写字母>-<数字或字符串>` 的项目内自定义短代号
+
+  规则：
+  - **错误示例 1（title）**：`title: 首次未提交退出后首次标志持久性 (CMS-024 / IR-038 / A-7)` —— 标题尾巴是一串纯代号，读者不知道这条用例真正要验证什么
+  - **正确示例 1（title）**：`title: 首次进入信息确认页未提交即退出，再次登录后页面仍按"首次确认"形态展示（待 PRD 澄清，CMS-024/IR-038/A-7）` —— 标题主体是可读语义，代号作为可选溯源后缀
+  - **错误示例 2（steps）**：`观察 F-005/F-006/F-007 字段` —— 执行者根本不知道这三个字段是什么
+  - **正确示例 2（steps）**：`观察"姓名"(F-005) / "出生年月"(F-006) / "性别"(F-007) 三个字段是否仍处于隐藏（未展开填写）状态`
+  - **错误示例 3（preconditions）**：`该账号 S-003 = true（首次进入）` —— 读者不知道 S-003 是什么标志
+  - **正确示例 3（preconditions）**：`该账号"首次进入信息确认页"标志（S-003）= true（即从未成功提交过会员信息）`
+  - **错误示例 4（expected）**：`按 A-7 假设，S-003 仍为 true（首次标志仅在提交成功后置 false）` —— 嵌套了 2 个代号
+  - **正确示例 4（expected）**：`"首次进入"标志(S-003)在用户未点击提交即退出时仍保持 true，再次登录时页面继续按首次形态展示；该结论基于"首次标志仅在提交成功后置 false"的推测（A-7，待 PRD 澄清）`
+  - **错误示例 5（key_assets）**：`S-003 持久性 (A-7 BLOCKED)`
+  - **正确示例 5（key_assets）**：`"首次进入信息确认页"标志(S-003)在未提交退出后的持久性契约——首次标志只在提交成功后才置 false，未提交退出不重置（A-7 推测，待 PRD 澄清）`
+  - **代号位置**：内部代号只允许出现在 `feature` / `sub_refs` / `sources` 三个**纯溯源字段**中作为机器索引；以及在内容字段中作为**括号注释**附在实际内容之后（不得替代内容、不得作为字段名/状态名/假设名的唯一标识符）
   - **预期为纯代号视为占位符**：参照"占位符零容忍自检"处理
+  - **可读性裁判**：写完后用"假装我从未读过需求文档"的视角再读一遍这条用例。如果任何字段需要回查外部文档才能理解，那就违反了自包含原则——回到对应字段，把代号背后的实际语义内嵌进去
 - **规则/枚举资产**: 不能只用“代表值”替代完整规则；必要时生成矩阵用例或附带规则清单。当需求中给出了完整的项目列表（如导航菜单项、类别名称、配置选项），用例必须逐项覆盖或以附录方式保留完整列表作为断言基准，不能仅抽取部分代表项
 - **集成资产**: 必须覆盖成功、失败、超时、重试或降级中的相关路径
 - **约束/合约资产**: 必须生成校验规则本身的用例，而不只是主流程 happy path
@@ -217,11 +237,13 @@ description: Use when generating functional test cases from confirmed requiremen
 - **访问路径完整性自检（强制）**: 生成完每个模块的全部用例后，回查 Step 1 中识别的所有访问路径。对每条路径检查是否有独立的用例覆盖其核心场景（入口展示、输入校验、执行流程、结果反馈）；若该路径涉及资源配额或频率限制，额外检查配额相关场景是否覆盖。如果某条路径完全没有用例，立即补充后再进入 Step 3 去重
 - **字段矩阵聚合自检（强制）**: 生成完每个模块的全部用例后，扫描所有 `type: single` 用例。如果同一功能下存在同字段（或同规则集）+ 同 `verification_method` + 同 `evidence_types` + 共享 `preconditions` + 仅"输入条件 → 预期结果"维度变化的独立用例 ≥3 条，必须合并为单条 `type: matrix` 用例，按维度命名 `groups[]`，公共元数据只写一次。**聚合时必须保留**：(a) 每个 row 的 `source` 字段；(b) 涉及逐字文案的 row 标注 `verbatim: true` 且 expected 完整写出逐字内容；(c) 推测或阻塞项标注 `status: blocked/inferred`。**禁止聚合**（任一命中即保留为独立 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单 row action 超过 5 个编号步骤
 - **matrix row 粒度自检（强制）**: 生成完 matrix 用例后，逐行检查每个 row 的 `action`：(a) 单步动作直接写字符串；(b) 多步动作必须使用 YAML block scalar `|` + 数字前缀 `1. 2. 3.`，禁止使用 nested list（`-` 列表）；(c) 单 row 的编号步骤数 ≤5，超出则拆出为独立 `type: single` 用例并在 findings.md 标注拆分原因
-- **内部代号自包含自检（强制）**: 生成完每个模块的全部用例后，对每条 `single` / `scenario_chain` / `matrix` 用例的 `action` / `expected` / `key_assets` / `preconditions` 字段逐项扫描，匹配以下代号正则：`\b(C|E|IR|CMS|CL|I|CTX)-?\w+\b`。命中后判定：
-  - 如果代号是字段值的**唯一内容**或承担了内容主体（例如 `expected: C-005` / `key_assets: [E-001]` / `preconditions: [CTX-B]`）→ **违规**，必须回查 `parsed-requirements.md` 中该代号定义的实际内容，将内容内嵌到字段中，代号降级为括号注释
-  - 如果代号已经作为括号注释附在实际内容之后（例如 `expected: 显示「请填写手机号」(C-004)`）→ **合规**，保留
-  - 如果代号定义的内容缺失或未定稿 → 按"占位符零容忍自检"处理（写入降级断言 + findings.md BLOCKED 记录）
+- **内部代号自包含自检（强制）**: 生成完每个模块的全部用例后，对每条 `single` / `scenario_chain` / `matrix` 用例的 `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 字段（以及 matrix 的 `groups[].name` / `groups[].rows[].action` / `groups[].rows[].expected`）逐项扫描，匹配以下代号正则：`\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`。命中后按以下顺序判定：
+  - **判定 1：代号是否承担了语义主体？** 如果字段值在去掉该代号后无法理解（例如 `expected: C-005` / `key_assets: [E-001]` / `preconditions: [CTX-B]` / `steps: 观察 F-005/F-006/F-007 字段` / `expected: S-003 仍为 true`）→ **违规**。必须回查 `parsed-requirements.md` / `module-dependencies.md` / `implicit-requirements.md` / `cross-module-scenarios.md` 中该代号定义的实际内容（字段中文名、文案原文、状态语义、假设描述、上下文条件等），将其内嵌到字段中，代号降级为括号注释附在其后
+  - **判定 2：代号是否仅作为溯源注释？** 如果代号以 `(代号)` 或 `（代号）` 形式附在实际内容之后（例如 `expected: 显示「请填写手机号」(C-004)` / `steps: 观察"姓名"(F-005)字段是否隐藏`）→ **合规**，保留
+  - **判定 3：title 字段特别规则** title 末尾的 `(代号1 / 代号2 / 代号3)` 串视为溯源后缀。要求 title 的主体部分（括号之前）必须独立表达本条用例要验证的业务行为，括号尾巴的代号删掉后 title 依然完整可读。**反例**：`首次未提交退出后首次标志持久性 (CMS-024 / IR-038 / A-7)`（删掉括号后剩下的"首次标志"未交代什么标志，主体不完整）→ 改写为 `首次进入信息确认页未提交即退出，再次登录后页面仍按"首次确认"形态展示（CMS-024/IR-038/A-7）`
+  - **判定 4：代号定义内容缺失或未定稿** → 按"占位符零容忍自检"处理（写入降级断言 + findings.md BLOCKED 记录），但 title / steps 等字段仍要把当前已知的业务语义写出来，不能用代号占位
   - **例外**：`feature` / `sub_refs` / `sources` 三个纯溯源字段允许直接放代号，不参与本自检
+  - **执行约束**：本自检需在每个模块全部用例生成后立即执行，不允许带着违规代号进入 Step 3 去重；违规项必须**逐字段修复**后再进入下一步，且修复不允许仅删除代号——必须补全代号背后的实际语义
 违规项立即修正后再进入 Step 3 去重
 生成时优先遵循：
 - 精准覆盖优于平均铺开
@@ -323,6 +345,13 @@ description: Use when generating functional test cases from confirmed requiremen
   - 每个"视觉验收项"是否有对应的独立用例，且验证方式显式标注为 `manual_visual_check` 或 `screenshot_comparison`？
   - 每个"合约/规则项"是否有专门的规则级验证用例（验证规则配置本身的正确性），而非仅被行为用例间接覆盖？
   - 任何未覆盖项标记为 CRITICAL 级别问题，要求补充后才能通过审查
+- **用例自包含独立性核验（强制）**：随机抽样至少 30% 的用例（含 single / matrix / scenario_chain 各至少 3 条），按"假装从未读过任何需求文档"的视角逐条阅读 `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions`。命中以下任一情况即标记 CRITICAL 级问题：
+  - `title` 主体（括号外的部分）无法独立表达验证目标，需要回查代号才能理解（例如 "首次未提交退出后首次标志持久性"——"首次标志"未交代是什么标志）
+  - 任一字段中存在代号承担语义主体的写法：`expected: C-005` / `steps: 观察 F-005/F-006/F-007 字段` / `preconditions: 该账号 S-003 = true` / `key_assets: [S-003 持久性 (A-7 BLOCKED)]` 等
+  - 阅读用例时需要回查 `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md` 才能理解任一字段
+  - 多个代号串联出现在 title 末尾 `(代号1 / 代号2 / 代号3)` 而 title 主体未提供独立可读的业务行为描述
+
+  CRITICAL 项一律要求生成方按"内部代号自包含自检"规则逐字段修复后重新提审，**不允许仅通过删除代号通过审查——必须补全代号背后的实际语义内容**
 **验证方式:** ui_text_assertion | ui_attribute_assertion | api_response_assertion | url_assertion | storage_assertion | screenshot_comparison | manual_visual_check | log_event_assertion | toast_alert_assertion | schema_assertion
 CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 
@@ -530,6 +559,9 @@ cases:
 | "matrix 用例的 row 可以省略 source" | row 级 source 是溯源链的最小单位，缺失等于该 row 未对齐需求 |
 | "verbatim 标记可有可无" | 没有 verbatim 标记，自动化脚本就敢做文案变量化，逐字断言资产会被悄悄抹平 |
 | "用 C-005/E-001/CTX-B 代号更简洁" | 用例必须脱离 parsed-requirements.md 独立可执行可入库；代号只能做溯源注释，不能替代内容 |
+| "title 后面跟一串 (CMS-024 / IR-038 / A-7) 看起来很专业" | 标题主体必须独立成句，删掉括号后依然要交代清楚验证什么业务行为；纯代号串无法告诉执行者用例意图 |
+| "步骤里写 'F-005/F-006/F-007 字段' 更精简" | 执行者不会回查需求才点开页面；字段必须写中文名（"姓名/出生年月/性别"），代号只作括号注释 |
+| "S-003/A-7 是项目内部公认的简写" | 用例的目标读者还包括外部测试管理系统、新加入的执行者、未来的自动化脚本作者；任何代号都不是"公认"的 |
 
 ## 本阶段完成标准
 

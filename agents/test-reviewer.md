@@ -79,7 +79,13 @@ This is the new P0 review layer. You must actively search for these gaps.
 
 - Does the requirement contain explicit copy/template/content but the cases only say "content is correct"?
 - Are field-by-field or item-by-item checks missing where the content itself is the requirement?
-- **Internal-code references**: do any cases use internal codes (`C-xxx`, `E-xxx`, `IR-xxx`, `CMS-xxx`, `CL-xxx`, `I-xxx`, `CTX-X`) as a **substitute for actual content** in `action` / `expected` / `key_assets` / `preconditions`? Cases must be self-contained — internal codes are allowed only in `feature` / `sub_refs` / `sources` (pure traceability fields), or as parenthetical annotations AFTER the literal content (e.g., `expected: 显示「请填写手机号」(C-004)`). Any field where a code carries the meaning instead of literal content is a **HIGH** issue.
+- **Internal-code references (self-containment)**: cases must be readable by someone who has never opened `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md`. Scan `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` (and `groups[].name` / `groups[].rows[].action` / `groups[].rows[].expected` for matrix cases) for codes matching `\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`. For each hit, judge:
+  - **HIGH violation — code carries the meaning**: the field becomes incomprehensible if the code is removed. Examples: `expected: C-005` / `key_assets: [E-001]` / `preconditions: [CTX-B]` / `steps: 观察 F-005/F-006/F-007 字段` / `expected: S-003 仍为 true` / `key_assets: [S-003 持久性 (A-7 BLOCKED)]`. The reviewer must require the literal field name (e.g., 姓名/出生年月/性别), copy text, state semantics, or assumption description be inlined; the code may remain only as a parenthetical traceability suffix.
+  - **HIGH violation — title with code-only suffix**: titles ending in `(代号1 / 代号2 / 代号3)` where the body before the parenthesis fails to independently describe the validated behavior. Example: `首次未提交退出后首次标志持久性 (CMS-024 / IR-038 / A-7)` — "首次标志" is undefined without lookup. Required form: a self-contained sentence in the title body, with codes optionally appended for traceability.
+  - **OK**: code appears as a parenthetical annotation after literal content, e.g., `expected: 显示「请填写手机号」(C-004)` / `steps: 观察"姓名"(F-005)字段是否隐藏`.
+  - **OK**: code appears in `feature` / `sub_refs` / `sources` (pure traceability fields).
+
+  Any field where a code carries the meaning instead of literal content is a **HIGH** issue; titles whose body cannot stand alone after removing the code suffix are also **HIGH**. Fixing by deleting the code without inlining the actual semantics does NOT clear the issue — the meaning must be added.
 
 #### B. Process Feedback Gaps
 
