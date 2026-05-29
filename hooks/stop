@@ -71,14 +71,15 @@ fi
 
 # Self-containment validator gate: if functional-cases.yaml exists and the
 # validator reports violations, block stop regardless of phase status. This
-# prevents declaring Phase 3 complete (or any later phase) while internal
-# codes still substitute for actual content.
+# prevents declaring Phase 3 complete (or any later phase) while any internal
+# code remains in a content field (whether substituting for content or as a
+# parenthetical traceability suffix).
 yaml_path=".supertester/test-cases/functional-cases.yaml"
 script_path="${CLAUDE_PLUGIN_ROOT:-.}/scripts/check-self-contained.py"
 if [ -f "$yaml_path" ] && [ -f "$script_path" ] && command -v python3 >/dev/null 2>&1; then
     validator_out=$(python3 "$script_path" "$yaml_path" --limit 30 2>&1 || true)
     if printf '%s' "$validator_out" | head -1 | grep -q "FAIL"; then
-        reason="Supertester self-containment validator FAILED on .supertester/test-cases/functional-cases.yaml. Fix every code-carries-meaning violation (inline the actual name/copy/state/assumption that each code stands for; keep the code only as a parenthetical traceability suffix) and re-run scripts/check-self-contained.py until exit code is 0 before stopping. Validator output (truncated): ${validator_out}"
+        reason="Supertester self-containment validator FAILED on .supertester/test-cases/functional-cases.yaml. Content fields must be code-free. Fix every code-in-content-field violation (inline the actual name/copy/state/assumption the code stands for AND delete the code from the content field — including parenthetical suffixes like 「文案」(C-011); register the code in feature/sub_refs/sources/source instead) and re-run scripts/check-self-contained.py until exit code is 0 before stopping. Validator output (truncated): ${validator_out}"
         reason_escaped=$(escape_for_json "$reason")
         printf '{\n  "decision": "block",\n  "reason": "%s"\n}\n' "$reason_escaped"
         exit 0
