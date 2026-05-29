@@ -2,14 +2,24 @@
 """
 Self-containment validator for .supertester/test-cases/functional-cases.yaml.
 
-Scans every test case's user-facing fields for internal codes
+Scans every test case's user-facing content fields for internal codes
 (C-xxx, E-xxx, IR-xxx, CMS-xxx, CL-xxx, I-xxx, CTX-x, F-xxx, R-xxx,
-UC-xxx, S-xxx, A-xxx, PR-xxx, P-xxx, SC-xxx) and flags occurrences where
-the code itself carries the semantic instead of acting as a parenthetical
-traceability annotation after literal content.
+UC-xxx, S-xxx, A-xxx, PR-xxx, P-xxx, SC-xxx) and flags EVERY occurrence.
+
+Content fields must be completely self-contained and code-free: the actual
+name / verbatim copy / state semantics / assumption must be written inline so
+the case reads cleanly to a human, an automation author, or an external test
+management system. Internal codes are allowed ONLY in the dedicated
+traceability fields (feature / sub_refs / sources / source), where they act as
+machine-readable cross-references and never reach the reader of the case body.
+
+NOTE: This is stricter than earlier revisions, which tolerated codes as
+parenthetical traceability suffixes inside content fields (e.g. 「文案」(C-001)).
+Those suffixes clutter the case and scramble the reading, so they are now
+violations too. Move every code to feature / sub_refs / sources / source.
 
 Rule reference:
-- skills/test-case-generation/SKILL.md '内部代号自包含自检（强制）'
+- skills/test-case-generation/SKILL.md '用例自包含原则'
 - agents/test-reviewer.md Section 3.A 'Internal-code references (self-containment)'
 
 Exit codes:
@@ -42,23 +52,10 @@ CODE_PATTERN = re.compile(
     re.ASCII,
 )
 
-# Single-pair parens matcher (no nested parens supported on purpose —
-# we iterate until stable).
-PARENS_PATTERN = re.compile(r"[(（]([^()（）]*)[)）]")
-
-# Characters that, when immediately to the left of a code (optionally
-# followed by whitespace), mark the code as a parenthetical traceability
-# annotation after literal content (e.g. 「文案」(C-001)).
-ANNOTATION_LEFT_CHARS = "」』\\)）\\]】\"\\'"
-ANNOTATION_LEFT_RE = re.compile(
-    rf"[{ANNOTATION_LEFT_CHARS}]\s*$"
-)
-
-# Fields that are pure traceability — codes are expected here and not
-# scanned.
+# Fields that are pure traceability — codes are expected here and not scanned.
 TRACEABILITY_ONLY_KEYS = {"feature", "sub_refs", "sources", "source"}
 
-# User-facing fields on case root that must be self-contained.
+# User-facing content fields on case root that must be code-free.
 ROOT_SCANNED_KEYS = {
     "title",
     "preconditions",
@@ -67,138 +64,27 @@ ROOT_SCANNED_KEYS = {
     "key_assets",
 }
 
-# Matrix row fields that must be self-contained.
+# Matrix row fields that must be code-free.
 MATRIX_ROW_SCANNED_KEYS = {"action", "expected"}
-
-# Light qualifier words that, together with codes and separators, render
-# a paren block a pure traceability annotation that can be stripped.
-LIGHT_QUALIFIERS = (
-    "推测",
-    "待PRD澄清",
-    "待澄清",
-    "BLOCKED",
-    "blocked",
-    "待定",
-    "待补充",
-    "TBD",
-    "todo",
-    "TODO",
-    "对应",
-    "依据",
-    "参见",
-    "见",
-)
-
-SEPARATOR_RE = re.compile(r"[\s/,，、;；:：]+")
-
-
-def is_traceability_only_parens(content: str) -> bool:
-    """Return True if parens content is just codes + separators + light qualifiers."""
-    if not CODE_PATTERN.search(content):
-        return False
-    stripped = CODE_PATTERN.sub("", content)
-    stripped = SEPARATOR_RE.sub("", stripped)
-    for word in LIGHT_QUALIFIERS:
-        stripped = stripped.replace(word, "")
-    return stripped == ""
-
-
-def strip_traceability_parens(text: str) -> str:
-    """Iteratively remove parens that are pure traceability annotations."""
-
-    def replace(match: re.Match) -> str:
-        if is_traceability_only_parens(match.group(1)):
-            return ""
-        return match.group(0)
-
-    prev: str | None = None
-    while prev != text:
-        prev = text
-        text = PARENS_PATTERN.sub(replace, text)
-    return text
-
-
-OPEN_PARENS = "(（"
-CLOSE_PARENS = ")）"
-
-
-def enclosing_parens(text: str, code_start: int, code_end: int) -> tuple[int, int] | None:
-    """Return (open_idx, close_idx) of the nearest balanced parens enclosing a code, or None."""
-    depth = 0
-    open_idx = -1
-    for i in range(code_start - 1, -1, -1):
-        ch = text[i]
-        if ch in CLOSE_PARENS:
-            depth += 1
-        elif ch in OPEN_PARENS:
-            if depth == 0:
-                open_idx = i
-                break
-            depth -= 1
-    if open_idx < 0:
-        return None
-    depth = 0
-    close_idx = -1
-    for i in range(code_end, len(text)):
-        ch = text[i]
-        if ch in OPEN_PARENS:
-            depth += 1
-        elif ch in CLOSE_PARENS:
-            if depth == 0:
-                close_idx = i
-                break
-            depth -= 1
-    if close_idx < 0:
-        return None
-    return (open_idx, close_idx)
-
-
-def code_is_paren_tail_annotation(
-    text: str, code_start: int, code_end: int
-) -> bool:
-    """OK pattern: (实际内容…，CODE[/CODE…]) — code(s) at the tail of a paren block."""
-    span = enclosing_parens(text, code_start, code_end)
-    if span is None:
-        return False
-    open_idx, close_idx = span
-    content_after = text[code_end:close_idx]
-    # Allow trailing codes + separators + light qualifiers only.
-    after_remainder = CODE_PATTERN.sub("", content_after)
-    after_remainder = SEPARATOR_RE.sub("", after_remainder)
-    for word in LIGHT_QUALIFIERS:
-        after_remainder = after_remainder.replace(word, "")
-    if after_remainder != "":
-        return False
-    content_before = text[open_idx + 1 : code_start]
-    chinese_before = re.findall(r"[一-鿿]", content_before)
-    return len(chinese_before) >= 2
 
 
 def find_violations_in_text(text: str, field_path: str) -> list[dict]:
-    """Find every internal code that is NOT a parenthetical traceability annotation."""
+    """Find every internal code in a content field — all are violations."""
     if not text:
         return []
     violations: list[dict] = []
-    cleaned = strip_traceability_parens(text)
-    for m in CODE_PATTERN.finditer(cleaned):
-        start, end = m.start(), m.end()
-        left_window = cleaned[max(0, start - 6) : start]
-        if ANNOTATION_LEFT_RE.search(left_window):
-            # Code follows a closing quote/bracket — annotation suffix after literal.
-            continue
-        if code_is_paren_tail_annotation(cleaned, start, end):
-            # Code sits at the tail of a parens block whose body is literal content.
-            continue
+    for m in CODE_PATTERN.finditer(text):
         code = m.group(0)
-        snippet_start = max(0, start - 16)
-        snippet_end = min(len(cleaned), end + 16)
-        snippet = cleaned[snippet_start:snippet_end]
+        start, end = m.start(), m.end()
+        snippet_start = max(0, start - 20)
+        snippet_end = min(len(text), end + 20)
+        snippet = text[snippet_start:snippet_end]
         violations.append(
             {
                 "field": field_path,
                 "code": code,
                 "snippet": snippet,
-                "rule": "code-carries-meaning",
+                "rule": "code-in-content-field",
             }
         )
     return violations
@@ -272,7 +158,7 @@ def collect_case_fields(case: dict):
 
 
 def title_body_issues(case: dict) -> list[dict]:
-    """Flag titles where the body before the trailing code-paren cannot stand alone."""
+    """Flag empty titles. Codes in the title are caught by the content scan."""
     title = case.get("title")
     if not isinstance(title, str) or not title.strip():
         return [
@@ -283,42 +169,16 @@ def title_body_issues(case: dict) -> list[dict]:
                 "rule": "title-empty",
             }
         ]
-    # Strip trailing code-only parens to get body.
-    m = re.search(r"[（(][^()（）]*[)）]\s*$", title)
-    if not m:
-        return []
-    trailing_content = title[m.start() + 1 : m.end() - 1]
-    body = title[: m.start()].strip()
-    # If trailing is pure traceability (codes + separators + light qualifiers),
-    # then the title body must be substantive on its own.
-    if not is_traceability_only_parens(trailing_content):
-        # Trailing parens contains substantive non-code text — fine for now;
-        # field-level scan will catch any meaning-carrying codes inside.
-        return []
-    cn_chars = re.findall(r"[一-鿿]", body)
-    if len(cn_chars) < 6:
-        return [
-            {
-                "field": "title",
-                "code": "",
-                "snippet": title,
-                "rule": "title-body-too-short",
-            }
-        ]
     return []
 
 
 RULE_MESSAGES = {
-    "code-carries-meaning": (
-        "代号 {code} 出现在 {field}，但前面没有字面内容承载。"
-        "代号只能作为括号溯源注释附在实际内容之后，例如 「实际内容」({code})；"
-        "不能用代号替代字段中的名称、文案、状态或假设描述。"
+    "code-in-content-field": (
+        "代号 {code} 出现在内容字段 {field}。内容字段必须完全自包含、零代号——"
+        "把代号背后的实际名称 / 逐字文案 / 状态语义 / 假设描述直接写进字段，删除该代号；"
+        "代号只允许出现在 feature / sub_refs / sources / source 四个纯溯源字段中。"
     ),
     "title-empty": "title 为空——必须用一句话描述本条用例要验证的业务行为。",
-    "title-body-too-short": (
-        "title 主体过短或仅由代号占据。删掉括号尾巴后剩余文字 < 6 个汉字，"
-        "无法独立表达验证目标；请在主体补充动宾结构（验证什么 / 何种条件 / 预期）。"
-    ),
 }
 
 
@@ -428,9 +288,11 @@ def main() -> int:
                 print(f"    {v['message']}")
                 print()
             print(
-                "修复要求：在出现代号的字段中，把代号替代的实际名称/文案/状态/假设的语义"
-                "内嵌进去，代号降级为括号注释（仅 feature / sub_refs / sources 三个"
-                "纯溯源字段允许直接放代号）。修复后重跑本校验直到 0 处违规，再进入下一步。"
+                "修复要求：内容字段（title / preconditions / steps / expected / "
+                "key_assets / matrix rows / branches）必须零代号。把每个代号替代的"
+                "实际名称 / 逐字文案 / 状态语义 / 假设描述内嵌进字段并删除代号；机器"
+                "可追踪性由 feature / sub_refs / sources / source 四个纯溯源字段承载。"
+                "修复后重跑本校验直到 0 处违规，再进入下一步。"
             )
 
     return 1 if all_issues else 0

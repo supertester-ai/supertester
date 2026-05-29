@@ -87,13 +87,13 @@ This is the new P0 review layer. You must actively search for these gaps.
 
 - Does the requirement contain explicit copy/template/content but the cases only say "content is correct"?
 - Are field-by-field or item-by-item checks missing where the content itself is the requirement?
-- **Internal-code references (self-containment)**: cases must be readable by someone who has never opened `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md`. Scan `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` (and `groups[].name` / `groups[].rows[].action` / `groups[].rows[].expected` for matrix cases) for codes matching `\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`. For each hit, judge:
-  - **HIGH violation — code carries the meaning**: the field becomes incomprehensible if the code is removed. Examples: `expected: C-005` / `key_assets: [E-001]` / `preconditions: [CTX-B]` / `steps: 观察 F-005/F-006/F-007 字段` / `expected: S-003 仍为 true` / `key_assets: [S-003 持久性 (A-7 BLOCKED)]`. The reviewer must require the literal field name (e.g., 姓名/出生年月/性别), copy text, state semantics, or assumption description be inlined; the code may remain only as a parenthetical traceability suffix.
-  - **HIGH violation — title with code-only suffix**: titles ending in `(代号1 / 代号2 / 代号3)` where the body before the parenthesis fails to independently describe the validated behavior. Example: `首次未提交退出后首次标志持久性 (CMS-024 / IR-038 / A-7)` — "首次标志" is undefined without lookup. Required form: a self-contained sentence in the title body, with codes optionally appended for traceability.
-  - **OK**: code appears as a parenthetical annotation after literal content, e.g., `expected: 显示「请填写手机号」(C-004)` / `steps: 观察"姓名"(F-005)字段是否隐藏`.
-  - **OK**: code appears in `feature` / `sub_refs` / `sources` (pure traceability fields).
+- **Internal-code references (self-containment)**: content fields must be completely code-free and readable by someone who has never opened `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md`. Scan `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` (and `groups[].name` / `groups[].rows[].action` / `groups[].rows[].expected` for matrix cases, plus `branches[]` for scenario chains) for codes matching `\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`. **Any code in a content field is a HIGH violation**, in either of these forms:
+  - **code carries the meaning**: the field is incomprehensible if the code is removed — `expected: C-005` / `key_assets: [E-001]` / `preconditions: [CTX-B]` / `steps: 观察 F-005/F-006/F-007 字段` / `expected: S-003 仍为 true`.
+  - **code as a parenthetical traceability suffix**: literal content followed by a code in parens — `限流功能(F-006)` / `expected: 显示「请填写手机号」(C-004)` / `key_assets: [...逐字断言（对应 CMS-020）]` / titles ending in `(代号1 / 代号2 / 代号3)`. These suffixes pollute the reader's understanding and scramble the sentence, so they are violations too — the code must be removed from the content field.
+  - **Required fix**: inline the literal field name (e.g., 姓名/出生年月/性别), copy text, state semantics, or assumption description, **delete the code from the content field**, and register the code in the pure-traceability fields (`feature` / `sub_refs` / `sources` / matrix row `source`).
+  - **OK**: code appears in `feature` / `sub_refs` / `sources` / matrix row `source` (pure traceability fields) — these are the only places codes may live.
 
-  Any field where a code carries the meaning instead of literal content is a **HIGH** issue; titles whose body cannot stand alone after removing the code suffix are also **HIGH**. Fixing by deleting the code without inlining the actual semantics does NOT clear the issue — the meaning must be added.
+  Any code surviving in a content field — meaning-carrying OR parenthetical suffix — is a **HIGH** issue. Fixing by deleting the code without inlining the actual semantics does NOT clear the issue (meaning must be added); leaving the code as a parenthetical suffix does NOT clear it either (the content field must end up code-free).
 
 #### B. Process Feedback Gaps
 
@@ -147,7 +147,7 @@ This is the new P0 review layer. You must actively search for these gaps.
 
 Classify as **CRITICAL** when:
 
-- the self-containment validator (`scripts/check-self-contained.py`) reports any `code-carries-meaning` / `title-empty` / `title-body-too-short` violation against `functional-cases.yaml`. One review record entry per validator violation, citing the `case_id`, `field` and `snippet` from the validator output. Verdict cannot be PASS while these exist.
+- the self-containment validator (`scripts/check-self-contained.py`) reports any `code-in-content-field` / `title-empty` violation against `functional-cases.yaml`. One review record entry per validator violation, citing the `case_id`, `field` and `snippet` from the validator output. Verdict cannot be PASS while these exist.
 
 ### Mandatory HIGH Classifications
 
@@ -161,7 +161,7 @@ Classify as **HIGH** when:
 - under-aggregation: ≥3 sibling singles that should have collapsed into a matrix (see 2a.A)
 - over-aggregation: a matrix that mixes verification_methods, evidence_types, or carries an action exceeding the 5-step ceiling (see 2a.B)
 - a matrix row lacks `source`, or a `verbatim: true` row's expected does not contain the literal copy
-- a case uses internal codes (`C-xxx`, `E-xxx`, `IR-xxx`, `CMS-xxx`, `CL-xxx`, `I-xxx`, `CTX-X`) as the sole content of `action` / `expected` / `key_assets` / `preconditions` instead of inlining the actual content (see 3.A)
+- a case carries internal codes (`C-xxx`, `E-xxx`, `IR-xxx`, `CMS-xxx`, `CL-xxx`, `I-xxx`, `CTX-X`, …) in any content field (`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions`) — whether as the sole content OR as a parenthetical traceability suffix after literal content — instead of keeping content fields code-free and moving codes to `feature` / `sub_refs` / `sources` / row `source` (see 3.A)
 
 ## Review Record Format
 
