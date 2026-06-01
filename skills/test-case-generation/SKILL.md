@@ -17,13 +17,13 @@ description: Use when generating functional test cases from confirmed requiremen
 > 如果需求中存在关键内容、规则、列表、状态断言、集成契约或证据链，它们不能在生成与去重过程中被概括丢失。
 
 > **同字段/同规则下的多分区必须聚合为 matrix 用例，不准平铺为独立 TC。**
-> 当满足同字段（或同规则集）+ 同验证方式 + 同证据类型 + 共享前置条件 + 仅"输入条件 → 预期结果"维度变化 + 候选 ≥3 条时，必须输出为单条 `type: matrix` 用例 + 分组矩阵（`groups[].rows[]`），公共元数据只写一次。平铺为 18 条仅"条件→预期"差异的独立 TC 视为零散派生 (sprawling)，列为 HIGH 级问题。
+> 当满足同字段（或同规则集）+ 同验证方式 + 同证据类型 + 共享前置条件 + 仅"输入条件 → 预期结果"维度变化 + 候选 ≥3 条时，必须输出为单条 `type: matrix` 用例 + 分组 step（`steps[]` 中以 `group: true` + `children` 表达，无 `groups` / `rows`），公共元数据只写一次。平铺为 18 条仅"条件→预期"差异的独立 TC 视为零散派生 (sprawling)，列为 HIGH 级问题。
 
 > **用例内容字段必须完全自包含、零代号。**
-> 任何阅读者（人工执行者、自动化脚本作者、外部测试管理系统）都应能仅凭一条用例本身判断它要做什么、要看什么——不需要回查 `parsed-requirements.md`、`cross-module-scenarios.md`、`implicit-requirements.md` 或任何其他文档。`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 这些**内容字段中禁止出现任何内部代号**——既不得用代号承担内容，也不得把代号当作括号溯源尾巴附在实际内容之后（如 `限流功能(F-006)` / `「文案」(C-011)`）。括号尾巴的代号会污染读者对用例的理解、打乱语句语义，必须删除。代号**只允许出现在 `feature` / `sub_refs` / `sources` / matrix row `source` 这几个纯溯源字段中**，由它们独家承载机器可追踪性。任何"S-003 仍为 true""观察 F-005/F-006/F-007 字段""按 A-7 假设""限流功能(F-006)"这类写法均视为违规，列为 CRITICAL 级问题。
+> 任何阅读者（人工执行者、自动化脚本作者、外部测试管理系统）都应能仅凭一条用例本身判断它要做什么、要看什么——不需要回查 `parsed-requirements.md`、`cross-module-scenarios.md`、`implicit-requirements.md` 或任何其他文档。`case_name` / `action` / `result` / `steps`（含 `children`）/ `key_assets` / `precondition` 这些**内容字段中禁止出现任何内部代号**——既不得用代号承担内容，也不得把代号当作括号溯源尾巴附在实际内容之后（如 `限流功能(F-006)` / `「文案」(C-011)`）。括号尾巴的代号会污染读者对用例的理解、打乱语句语义，必须删除。代号**只允许出现在 `feature` / `sub_refs` / `sources` / 叶子 step `source` 这几个纯溯源字段中**，由它们独家承载机器可追踪性。任何"S-003 仍为 true""观察 F-005/F-006/F-007 字段""按 A-7 假设""限流功能(F-006)"这类写法均视为违规，列为 CRITICAL 级问题。
 
-> **每条用例必须显式标注优先级（P0 / P1 / P2），不得留空、不得"全部 P1"一刀切。**
-> 优先级反映"该测试失败时的业务影响 × 触发概率"。**P0 = 阻塞级**（核心主流程、安全、资金、数据完整性、关键契约——失败即影响发布）；**P1 = 重要级**（关键校验、常用异常路径、集成失败处理、主语言文案、关键状态转换——失败即明显缺陷）；**P2 = 次要级**（罕见边界、长尾组合、纯视觉细节、低流量平台/语言、加固型用例——失败可延后修复）。每个功能至少有 1 条 P0 用例覆盖其核心成功路径；任何缺失 `priority` 或将全部用例标为同一等级的产出，视为优先级分级缺失，列为 HIGH 级问题。
+> **每个叶子 step 必须显式标注优先级 `level`（P0 / P1 / P2），不得留空、不得"全部 P1"一刀切。**
+> 优先级反映"该测试失败时的业务影响 × 触发概率"。**P0 = 阻塞级**（核心主流程、安全、资金、数据完整性、关键契约——失败即影响发布）；**P1 = 重要级**（关键校验、常用异常路径、集成失败处理、主语言文案、关键状态转换——失败即明显缺陷）；**P2 = 次要级**（罕见边界、长尾组合、纯视觉细节、低流量平台/语言、加固型用例——失败可延后修复）。每个功能至少有 1 条含 `level: P0` 叶子 step 的用例覆盖其核心成功路径；任何缺失 `level` 或将全部叶子 step 标为同一等级的产出，视为优先级分级缺失，列为 HIGH 级问题。
 
 <HARD-GATE>
 在用户确认功能用例之前，不准进入 automation-analysis 阶段。
@@ -146,26 +146,28 @@ description: Use when generating functional test cases from confirmed requiremen
 4. 根据映射表决定调用哪些生成器
 5. 为该功能选择合适的用例粒度（对应 YAML `type` 字段）：
    - **`type: single`**: 单点行为、独立验证、不可拆解的最小测试单元
-   - **`type: matrix`**: 同字段或同规则集下 ≥3 条仅"条件→预期"维度变化的分区集合。**强制触发条件**（满足全部即必须聚合）：(a) 同一字段或同一规则集；(b) 同一 `verification_method`；(c) 同一 `evidence_types`；(d) 共享前置条件；(e) 行为差异只在"输入/触发条件"和"预期"两列。**禁止聚合**（任一命中即拆为 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单 row action 超过 5 个编号步骤
+   - **`type: matrix`**: 同字段或同规则集下 ≥3 条仅"条件→预期"维度变化的分区集合。**强制触发条件**（满足全部即必须聚合）：(a) 同一字段或同一规则集；(b) 同一 `verification_method`；(c) 同一 `evidence_types`；(d) 共享前置条件；(e) 行为差异只在"输入/触发条件"和"预期"两列。**禁止聚合**（任一命中即拆为 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单个叶子 step 的 action 超过 5 个编号步骤
    - **`type: scenario_chain`**: 多步骤端到端流程、共享资源冲突、异常恢复链、多观测面共同验证的证据链路径
-6. 记录粒度选择理由到 findings.md，含本功能下识别出的所有 matrix 候选清单（字段名 + 分组维度 + 候选 row 数）
+6. 记录粒度选择理由到 findings.md，含本功能下识别出的所有分组候选清单（字段名 + 分组维度 + 候选 children 叶子 step 数）
 
 ### Step 2: 调用子生成器
 
 按选择的生成器组合，为每个功能生成用例。**输出形式是 YAML 节点，不是 Markdown 段落**。
 
 #### 通用元数据字段（所有 type 必填）
-- `id`: 用例 ID (TC-xxx)
-- `title`: 用例标题，简短描述意图
-- `type`: `single` | `matrix` | `scenario_chain`
+- `id`: 用例 ID (TC-xxx)，保留作内部溯源（外部用例库可忽略）
+- `case_name`: 用例名称，**去掉编号前缀**，一句话独立可读、零代号（原 `title`）
+- `type`: `single` | `matrix` | `scenario_chain`（语义标签保留；matrix 现仅表示"含分组 step"）
 - `module`: 所属模块
 - `feature`: 功能 ID (F-xxx)，可附 `sub_refs: [E-xxx, I-xxx]`。**这是承载代号的纯溯源字段**——内容字段里被删掉的代号在这里登记。可写成 `名称(F-xxx)` 形态，既保留人类可读名又保留代号索引
-- `priority`: 优先级，从枚举选择，不得留空。枚举值：`P0` / `P1` / `P2`（语义见下方"优先级分级规则"）
 - `verification_method`: 验证方式（从枚举选择，不得留空。枚举值：`ui_text_assertion` / `ui_attribute_assertion` / `api_response_assertion` / `url_assertion` / `storage_assertion` / `screenshot_comparison` / `manual_visual_check` / `log_event_assertion` / `toast_alert_assertion` / `schema_assertion`）
 - `evidence_types`: 列表，从 UI / API / DB / Event / File / Message / Log / Metrics / External 中选择 ≥1 项
-- `automation`: `automatable` | `partial` | `manual`
-- `preconditions`: 共享前置条件列表
+- `automation`: `automatable` | `partial` | `manual`（父级默认；叶子 step 可单独覆盖）
+- `precondition`: 共享前置条件，**字符串**（多条用 `|` block scalar + `1. 2. 3.`），无则空字符串 `""`（原 `preconditions` 列表）
+- `steps`: 步骤列表；叶子 step = `{action, result, level}`，分组 step = `{action: <组名>, group: true, result: "", children: [<叶子 step>]}`（详见"type 决定下层结构"与"输出格式"）
 - `key_assets`: 关键资产说明列表（含逐字文案/规则枚举/集成契约描述）；**用自然语言写出资产本身，禁止出现内部代号**（代号登记到 `sub_refs` / `sources`）；无则写 `[]`
+
+> **优先级 `level` 不在用例级，而是写在每个叶子 step 上**（取值 `P0` / `P1` / `P2`，默认 `P1`；分组 step 不写）。用例有效优先级 = 其全部叶子 step 的最高档，写入 `meta.level_distribution`。
 
 #### 优先级分级规则（P0 / P1 / P2）
 
@@ -175,48 +177,52 @@ description: Use when generating functional test cases from confirmed requiremen
 |------|------|---------|-----------|
 | **P0** | 阻塞级 / Blocker：失败即影响发布或导致严重事故 | 核心主流程 happy path / 资金交易与扣费 / 数据完整性与幂等 / 鉴权与权限 / 注入与越权 / 关键合规 / 跨模块关键状态契约 / 生产事故复现回归 | 不修不能发、影响所有用户、涉钱、涉权限、涉数据丢失 |
 | **P1** | 重要级 / Major：失败即明显缺陷，多数情况下必须修复 | 关键输入校验规则本身 / 主要替代路径与错误恢复 / 主要语言文案与文案级断言 / 关键状态转换与中断恢复 / 集成失败/超时/降级处理 / 品牌关键区域视觉验收 / 主流终端/浏览器/分辨率 / 中等流量异常 | 影响一类用户或一个关键流程、有清晰可见的功能损坏 |
-| **P2** | 次要级 / Minor：失败时业务影响有限，可延后修复 | 罕见边界值组合 / 长尾分区在 matrix 中的稀疏 row / 次要语言或地区文案的非主路径 / 低流量平台或浏览器 / 纯视觉细节（间距、字号微差） / 加固性用例（DOS 防护、模糊输入） / 已知低概率组合 | 触发条件苛刻、视觉/体验类、用户可绕开 |
+| **P2** | 次要级 / Minor：失败时业务影响有限，可延后修复 | 罕见边界值组合 / 长尾分区在分组中的稀疏叶子 step / 次要语言或地区文案的非主路径 / 低流量平台或浏览器 / 纯视觉细节（间距、字号微差） / 加固性用例（DOS 防护、模糊输入） / 已知低概率组合 | 触发条件苛刻、视觉/体验类、用户可绕开 |
 
 **强制规则**：
-1. **每个功能至少 1 条 P0**：每个 `F-xxx` 的核心成功路径必须有至少 1 条 `priority: P0` 用例。如果一个功能的主流程已被某个 `scenario_chain` 覆盖，则该 `scenario_chain` 即为 P0 候选
+1. **每个功能至少 1 条 P0**：每个 `F-xxx` 的核心成功路径必须有至少 1 条含 `level: P0` 叶子 step 的用例。如果一个功能的主流程已被某个 `scenario_chain` 覆盖，则该 `scenario_chain` 即为 P0 候选
 2. **安全/资金/数据完整性默认 P0**：以下场景一律 P0，不允许降级——鉴权（登录/登出/会话）、权限校验、注入与越权、支付与扣费、订单与库存、数据写入与幂等、不可逆操作（删除/转移/解绑）
 3. **多语言交叉**：主语言（默认语言）下的错误文案断言 ≥ P1；次要语言下的错误文案断言可为 P2。但**关键操作**（鉴权、支付）下任一语言的错误文案均 ≥ P1
-4. **matrix row 优先级**：父用例的 `priority` 表示该矩阵的总体级别；行内可通过 `priority` 字段单独覆盖（例如父级 P1，某条罕见组合 row 标 P2；父级 P0，某条加固性 row 标 P1）。覆盖时**不允许升档**——row 优先级不得高于父级（如需高于父级，应拆为独立 `single` 用例）
-5. **scenario_chain 中 branch**：父用例 `priority` 表示主路径级别；`branches[].priority` 可单独覆盖错误恢复或替代路径的级别
-6. **禁止全档一致**：单个功能下若所有用例同档（例如全 P1），视为未做分级，列为 HIGH 级问题。少数特例（如纯校验规则集功能只有 P1）需在 findings.md 记录理由
+4. **分组内叶子 step 优先级**：分组 step（`group: true`）本身不写 `level`；其每个 children 叶子 step 各自标 `level`（例如多数标 P1，某条罕见组合标 P2，某条加固性标 P0）。用例有效 level 由全部叶子 step 最高档汇总，无"父级上限"约束
+5. **scenario_chain 主链与分支**：主链每个叶子 step 各自标 `level`；替代路径/错误恢复路径已拆为独立用例（不再用 `branches`），其 `level` 在各自用例的叶子 step 上独立标注
+6. **禁止全档一致**：单个功能下若所有叶子 step 同档（例如全 P1），视为未做分级，列为 HIGH 级问题。少数特例（如纯校验规则集功能只有 P1）需在 findings.md 记录理由
 7. **理由可溯源**：在 findings.md 中按模块记录优先级分布的判定理由（哪些被认定 P0、为什么；哪些降级为 P2、依据是什么），不要求逐条记录，但要求记录"关键档位决策"
 
 #### type 决定下层结构
 
 **`type: single`** 必含：
-- `steps`: 测试步骤列表（单步直接写字符串；多步用 `|` block scalar + `1. 2. 3.` 数字前缀，不允许 nested list）
-- `expected`: 预期结果列表（同上规则）
+- `steps`: 叶子 step 列表，每个 step = `{action, result, level}`：
+  - `action`: 操作（单步直接写字符串；多步用 `|` block scalar + `1. 2. 3.` 数字前缀，不允许 nested list）
+  - `result`: 预期结果（同上规则）
+  - `level`: `P0` / `P1` / `P2`，默认 `P1`
 - `sources`: 溯源数组，每项 `{ file, lines, text? }`
 
-**`type: matrix`** 必含：
-- `groups`: 分组数组。每个分组：
-  - `name`: 分组名（对应需求中"字段校验的某一个维度"，如"IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
-  - `rows`: 2 列结构数组，每个 row 形如：
-    ```yaml
-    - action: 描述触发条件和操作（单步字符串；多条件用 | + 1. 2. 3.）
-      expected: 预期结果（单字符串；多预期同样用 | + 1. 2. 3.）
-      source: 单字符串溯源标记（如 "L35" / "IR-009"）
-      verbatim: true   # 可选；标记 expected 中引号内文案需逐字断言
-      status: blocked  # 可选；blocked / inferred；表示推测或被阻塞
-      automation: manual  # 可选；row 级覆盖父用例的 automation
-      priority: P2     # 可选；row 级覆盖父用例的 priority，且不得高于父级
-    ```
-  - **5-step ceiling**: 单个 row 的 `action` 不允许超过 5 个编号步骤；超出表明应升级为独立 `single` 用例
+**`type: matrix`** 必含（分组通过 `steps` 内的分组 step 表达，**没有 `groups` / `rows`**）：
+- `steps`: 列表，每个分组是一个**分组 step**：
+  ```yaml
+  - action: 分组名（对应需求中"字段校验的某一个维度"，如"IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
+    group: true
+    result: ""           # 分组节点 result 可空
+    children:            # 该分组下的叶子 step（原 rows）
+      - action: 描述触发条件和操作（单步字符串；多条件用 | + 1. 2. 3.）
+        result: 预期结果（单字符串；多预期同样用 | + 1. 2. 3.）
+        level: P1         # 叶子 step 优先级，默认 P1
+        source: 单字符串溯源标记（如 "L35" / "IR-009"）
+        verbatim: true    # 可选；标记 result 中引号内文案需逐字断言
+        status: blocked   # 可选；blocked / inferred；表示推测或被阻塞
+        automation: manual   # 可选；叶子 step 级覆盖父用例的 automation
+  ```
+  - **5-step ceiling**: 单个 children 叶子 step 的 `action` 不允许超过 5 个编号步骤；超出表明应升级为独立 `single` 用例
+- `sources`: 溯源数组
 
 **`type: scenario_chain`** 必含：
-- `steps`: 步骤列表（同 single）
-- `expected`: 预期结果列表
+- `steps`: 叶子 step 列表（同 single：每个 `{action, result, level}`，主链按顺序排列）
 - `sources`: 溯源数组
-- 可选 `branches`: 替代路径或错误恢复路径数组，每项含 `name` + `steps` + `expected`，可选 `priority`（覆盖父级，不得高于父级）
+- **不再有 `branches`**：替代路径/错误恢复路径每条拆为独立用例（同 `feature` / `sub_refs`，`case_name` 标明分支语义），用自己的 `precondition` + `steps` 完整描述
 
 如果功能包含关键测试资产，至少满足以下规则：
 - **内容资产**: 用例中写出要校验的关键内容类型，不得只写"内容正确"。当需求文档中提供了具体文案、标签或格式要求时，用例的预期结果必须包含字符串级断言（如具体文案文本、格式模板），不能停留在"显示正确"或"文案符合预期"。**禁止文档引用替代**：预期结果中不得以"见 XX 文档 §X.X""参照需求文档""具体文案见设计稿"等外部引用替代实际内容——用例必须自包含，审查者和自动化脚本无需回查任何外部文档即可判断预期是否满足。如果原始文案内容较长、不适合完整内嵌，在用例预期结果中至少内嵌可唯一标识该文案的关键片段（如首句 + 末句 + 核心约束段），并以附录形式保留全文作为断言基准
-- **用例自包含原则（强制）**: 一条用例必须能脱离 `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md` 等任何外部文档独立执行和入库。`title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 这些**内容字段中禁止出现任何内部代号**——既不得用代号替代实际内容，也不得把代号当括号溯源尾巴附在实际内容之后。内部代号包括但不限于：
+- **用例自包含原则（强制）**: 一条用例必须能脱离 `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md` 等任何外部文档独立执行和入库。`case_name` / `action` / `result` / `steps`（含 `children`）/ `key_assets` / `precondition` 这些**内容字段中禁止出现任何内部代号**——既不得用代号替代实际内容，也不得把代号当括号溯源尾巴附在实际内容之后。内部代号包括但不限于：
   - 文案/枚举类：`C-xxx`（文案码）、`E-xxx`（枚举码）
   - 需求/场景类：`IR-xxx`（隐含需求码）、`CMS-xxx`（跨模块场景码）、`CL-xxx`（澄清码）、`I-xxx`（事项码）
   - 功能/特性类：`F-xxx`（功能码）、`R-xxx`（规则码）、`UC-xxx`（用例码）
@@ -225,18 +231,18 @@ description: Use when generating functional test cases from confirmed requiremen
   - 任何形如 `<1-3 个大写字母>-<数字或字符串>` 的项目内自定义短代号
 
   规则（内容字段一律写干净的可读语义，代号下沉到溯源字段，**不保留括号代号尾巴**）：
-  - **错误示例 1（title）**：`title: 短信验证码校验与限流功能(F-006) + 获取/重新获取验证码功能(F-007) 端到端主流程` —— 括号代号尾巴污染标题，读起来语义错乱
-  - **正确示例 1（title）**：`title: 短信验证码校验与限流端到端主流程 — 获取验证码并输入正确码后校验通过`（代号 F-006 / F-007 登记到 `feature` / `sub_refs`）
+  - **错误示例 1（case_name）**：`case_name: 短信验证码校验与限流功能(F-006) + 获取/重新获取验证码功能(F-007) 端到端主流程` —— 括号代号尾巴污染名称，读起来语义错乱
+  - **正确示例 1（case_name）**：`case_name: 短信验证码校验与限流端到端主流程 — 获取验证码并输入正确码后校验通过`（代号 F-006 / F-007 登记到 `feature` / `sub_refs`）
   - **错误示例 2（steps）**：`观察 F-005/F-006/F-007 字段` —— 执行者根本不知道这三个字段是什么
   - **正确示例 2（steps）**：`观察"姓名" / "出生年月" / "性别"三个字段是否仍处于隐藏（未展开填写）状态`
-  - **错误示例 3（preconditions）**：`该账号 S-003 = true（首次进入）` —— 读者不知道 S-003 是什么标志
-  - **正确示例 3（preconditions）**：`该账号"首次进入信息确认页"标志 = true（即从未成功提交过会员信息）`
-  - **错误示例 4（expected）**：`按 A-7 假设，S-003 仍为 true（首次标志仅在提交成功后置 false）` —— 嵌套了 2 个代号
-  - **正确示例 4（expected）**：`"首次进入"标志在用户未点击提交即退出时仍保持 true，再次登录时页面继续按首次形态展示；该结论基于"首次标志仅在提交成功后置 false"的推测（待 PRD 澄清）`
+  - **错误示例 3（precondition）**：`该账号 S-003 = true（首次进入）` —— 读者不知道 S-003 是什么标志
+  - **正确示例 3（precondition）**：`该账号"首次进入信息确认页"标志 = true（即从未成功提交过会员信息）`
+  - **错误示例 4（result）**：`按 A-7 假设，S-003 仍为 true（首次标志仅在提交成功后置 false）` —— 嵌套了 2 个代号
+  - **正确示例 4（result）**：`"首次进入"标志在用户未点击提交即退出时仍保持 true，再次登录时页面继续按首次形态展示；该结论基于"首次标志仅在提交成功后置 false"的推测（待 PRD 澄清）`
   - **错误示例 5（key_assets）**：`短信下发成功文案「验证码已发送，15分钟内有效」(C-011) 逐字断言`
   - **正确示例 5（key_assets）**：`短信下发成功文案「验证码已发送，15分钟内有效」逐字断言`（代号 C-011 登记到 `sources` / `sub_refs`）
-  - **代号位置**：内部代号**只允许出现在 `feature` / `sub_refs` / `sources` / matrix row `source` 这几个纯溯源字段中**作为机器索引；内容字段（含其中的括号、引号内外）一律不得出现任何代号
-  - **保留溯源**：删掉内容字段的代号不等于丢失溯源——把代号登记到 `feature`（功能码）/ `sub_refs`（关联码）/ `sources`（行号+原文）/ row `source`（行级溯源）。这几个字段是溯源的唯一归宿
+  - **代号位置**：内部代号**只允许出现在 `feature` / `sub_refs` / `sources` / 叶子 step `source` 这几个纯溯源字段中**作为机器索引；内容字段（含其中的括号、引号内外）一律不得出现任何代号
+  - **保留溯源**：删掉内容字段的代号不等于丢失溯源——把代号登记到 `feature`（功能码）/ `sub_refs`（关联码）/ `sources`（行号+原文）/ 叶子 step `source`（行级溯源）。这几个字段是溯源的唯一归宿
   - **待澄清/推测仍写语义**：若代号背后的内容未定稿或属推测，用自然语言写出当前已知语义 + `（待 PRD 澄清）`/`（推测）`，参照"占位符零容忍自检"处理；不得用代号占位
   - **可读性裁判**：写完后用"假装我从未读过需求文档"的视角再读一遍这条用例。如果任何内容字段里还能看到 `X-xxx` 形态的代号，删掉它，把语义写全，把代号搬到溯源字段
 - **规则/枚举资产**: 不能只用“代表值”替代完整规则；必要时生成矩阵用例或附带规则清单。当需求中给出了完整的项目列表（如导航菜单项、类别名称、配置选项），用例必须逐项覆盖或以附录方式保留完整列表作为断言基准，不能仅抽取部分代表项
@@ -260,13 +266,13 @@ description: Use when generating functional test cases from confirmed requiremen
 - **状态转换链完整性自检（强制）**: 对每个涉及输入清洗、格式转换或自动补全的功能，检查是否建模了完整的状态转换链（原始输入 → 转换处理 → 转换后重校验）。仅验证转换结果而未验证转换触发条件和转换后的下游校验联动视为 state_transition 缺陷，立即补充后再进入 Step 3 去重
 - **多语言完整性自检（强制）**: 生成完每个模块的全部用例后，回查 parsed-requirements.md 的 Multi-Language Inventory。对其中每个标注了多语言要求的文案项，检查是否每种语言都有独立的用例分支，且每个分支的预期结果中包含该语言环境下的逐字文案文本（不能仅写“对应语言文案正确”或“切换语言后文案符合预期”）。仅覆盖部分语言而遗漏其他语言、或虽有用例但预期结果中缺少逐字文案均视为 contract_verification 缺陷，立即补充后再进入 Step 3 去重
 - **访问路径完整性自检（强制）**: 生成完每个模块的全部用例后，回查 Step 1 中识别的所有访问路径。对每条路径检查是否有独立的用例覆盖其核心场景（入口展示、输入校验、执行流程、结果反馈）；若该路径涉及资源配额或频率限制，额外检查配额相关场景是否覆盖。如果某条路径完全没有用例，立即补充后再进入 Step 3 去重
-- **字段矩阵聚合自检（强制）**: 生成完每个模块的全部用例后，扫描所有 `type: single` 用例。如果同一功能下存在同字段（或同规则集）+ 同 `verification_method` + 同 `evidence_types` + 共享 `preconditions` + 仅"输入条件 → 预期结果"维度变化的独立用例 ≥3 条，必须合并为单条 `type: matrix` 用例，按维度命名 `groups[]`，公共元数据只写一次。**聚合时必须保留**：(a) 每个 row 的 `source` 字段；(b) 涉及逐字文案的 row 标注 `verbatim: true` 且 expected 完整写出逐字内容；(c) 推测或阻塞项标注 `status: blocked/inferred`。**禁止聚合**（任一命中即保留为独立 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单 row action 超过 5 个编号步骤
-- **matrix row 粒度自检（强制）**: 生成完 matrix 用例后，逐行检查每个 row 的 `action`：(a) 单步动作直接写字符串；(b) 多步动作必须使用 YAML block scalar `|` + 数字前缀 `1. 2. 3.`，禁止使用 nested list（`-` 列表）；(c) 单 row 的编号步骤数 ≤5，超出则拆出为独立 `type: single` 用例并在 findings.md 标注拆分原因
-- **内部代号自包含自检（强制）**: 生成完每个模块的全部用例后，对每条 `single` / `scenario_chain` / `matrix` 用例的 `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions` 字段（以及 matrix 的 `groups[].name` / `groups[].rows[].action` / `groups[].rows[].expected`、scenario_chain 的 `branches[]`）逐项扫描，匹配以下代号正则：`\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`。**只要内容字段中命中任何一个代号即为违规**（无论它是承担语义主体，还是只作括号溯源尾巴）：
+- **字段矩阵聚合自检（强制）**: 生成完每个模块的全部用例后，扫描所有 `type: single` 用例。如果同一功能下存在同字段（或同规则集）+ 同 `verification_method` + 同 `evidence_types` + 共享 `precondition` + 仅"输入条件 → 预期结果"维度变化的独立用例 ≥3 条，必须合并为单条 `type: matrix` 用例（用分组 step 表达：`group: true` + `children`），按维度命名分组 step 的 `action`（组名），公共元数据只写一次。**聚合时必须保留**：(a) 每个 children 叶子 step 的 `source` 字段；(b) 涉及逐字文案的叶子 step 标注 `verbatim: true` 且 `result` 完整写出逐字内容；(c) 推测或阻塞项标注 `status: blocked/inferred`。**禁止聚合**（任一命中即保留为独立 single）：跨字段、跨证据类型、含独立步骤序列（中断恢复/防抖/并发）、单个叶子 step 的 action 超过 5 个编号步骤
+- **分组叶子 step 粒度自检（强制）**: 生成完含分组 step 的用例后，逐个检查每个 children 叶子 step 的 `action`：(a) 单步动作直接写字符串；(b) 多步动作必须使用 YAML block scalar `|` + 数字前缀 `1. 2. 3.`，禁止使用 nested list（`-` 列表）；(c) 单个叶子 step 的编号步骤数 ≤5，超出则拆出为独立 `type: single` 用例并在 findings.md 标注拆分原因
+- **内部代号自包含自检（强制）**: 生成完每个模块的全部用例后，对每条 `single` / `scenario_chain` / `matrix` 用例的 `case_name` / `precondition` / `steps[].action` / `steps[].result` / `steps[].children[].action` / `steps[].children[].result`（分组 step 的组名 `action`）/ `key_assets` 字段逐项扫描，匹配以下代号正则：`\b(C|E|IR|CMS|CL|I|CTX|F|R|UC|S|A|PR|P|SC)-\w+\b`。**只要内容字段中命中任何一个代号即为违规**（无论它是承担语义主体，还是只作括号溯源尾巴）：
   - **修复方式**：回查 `parsed-requirements.md` / `module-dependencies.md` / `implicit-requirements.md` / `cross-module-scenarios.md` 中该代号定义的实际内容（字段中文名、文案原文、状态语义、假设描述、上下文条件等），将其**完整内嵌到字段中并删除该代号**——不保留任何括号代号尾巴
-  - **溯源去向**：被删掉的代号登记到 `feature`（功能码）/ `sub_refs`（关联码）/ `sources`（行号+原文）/ matrix row `source`（行级溯源）。这几个纯溯源字段是代号的唯一归宿，不参与本自检
-  - **title 特别规则**：title 必须是一句独立可读、删掉后无法压缩的业务行为描述，**结尾不得带 `(代号…)` 括号尾巴**。反例 `短信验证码校验与限流功能(F-006) + 获取/重新获取验证码功能(F-007) 端到端主流程` → 改写为 `短信验证码校验与限流端到端主流程 — 获取验证码并输入正确码后校验通过`，代号 F-006/F-007 进 `feature`/`sub_refs`
-  - **代号定义缺失或未定稿** → 按"占位符零容忍自检"处理（写入降级断言 + findings.md BLOCKED 记录），但 title / steps 等字段仍要把当前已知的业务语义写出来（如 `（待 PRD 澄清）`），不能用代号占位
+  - **溯源去向**：被删掉的代号登记到 `feature`（功能码）/ `sub_refs`（关联码）/ `sources`（行号+原文）/ 叶子 step `source`（行级溯源）。这几个纯溯源字段是代号的唯一归宿，不参与本自检
+  - **case_name 特别规则**：case_name 必须是一句独立可读、删掉后无法压缩的业务行为描述，**结尾不得带 `(代号…)` 括号尾巴**。反例 `短信验证码校验与限流功能(F-006) + 获取/重新获取验证码功能(F-007) 端到端主流程` → 改写为 `短信验证码校验与限流端到端主流程 — 获取验证码并输入正确码后校验通过`，代号 F-006/F-007 进 `feature`/`sub_refs`
+  - **代号定义缺失或未定稿** → 按"占位符零容忍自检"处理（写入降级断言 + findings.md BLOCKED 记录），但 case_name / steps 等字段仍要把当前已知的业务语义写出来（如 `（待 PRD 澄清）`），不能用代号占位
   - **执行约束**：本自检需在每个模块全部用例生成后立即执行，不允许带着违规代号进入 Step 3 去重；违规项必须**逐字段修复**后再进入下一步，且修复必须是"补全语义 + 删代号 + 把代号搬到溯源字段"，不允许只删代号丢掉语义
 违规项立即修正后再进入 Step 3 去重
 - **确定性校验器闸门（强制 HARD GATE）**: LLM 的自检已被多次证明会漂移；本规则不再依赖你自己扫描代号，而是**强制执行**插件根目录下的 `scripts/check-self-contained.py`。每次写完或修改 `.supertester/test-cases/functional-cases.yaml` 后必须立刻运行：
@@ -277,16 +283,14 @@ description: Use when generating functional test cases from confirmed requiremen
   - 退出码 `1` = 仍有违规，**禁止进入 Step 3**，必须按校验器输出的 `field` + `snippet` 逐项修复，再重跑直到退出码 `0`
   - 退出码 `2` = 文件缺失或 YAML 解析失败，先修复语法或路径再重跑
   - PostToolUse hook 也会在每次 Write/Edit 后自动执行该校验器并把违规清单作为 `<SELF-CONTAINMENT-VIOLATIONS>` 注入上下文——看到该块代表当前文件不符合自包含规则，立即修复，不允许声明 Phase 3 完成、不允许把文件提交给 test-reviewer
-  - 修复方式：在违规字段中把代号背后的**实际中文名/逐字文案/状态语义/假设描述**内嵌进去，并**删除该代号**（合法形态：`显示「请填写手机号」` / `已提醒过中文名提示标志 = false`）；被删的代号登记到 `feature` / `sub_refs` / `sources` / row `source` 纯溯源字段
+  - 修复方式：在违规字段中把代号背后的**实际中文名/逐字文案/状态语义/假设描述**内嵌进去，并**删除该代号**（合法形态：`显示「请填写手机号」` / `已提醒过中文名提示标志 = false`）；被删的代号登记到 `feature` / `sub_refs` / `sources` / 叶子 step `source` 纯溯源字段
   - 内容字段一律零代号——**包括括号溯源尾巴**（`「文案」(C-004)` 也算违规）；不允许只删语义保留代号，也不允许把 functional-cases.yaml 拆成多个文件来绕过校验
-- **优先级标注自检（强制）**: 生成完每个模块的全部用例后，逐条检查每条用例是否有 `priority` 字段且取值 ∈ {`P0`, `P1`, `P2`}。命中以下任一情况视为缺陷，立即修正后再进入 Step 3 去重：
-  - 字段缺失或为空 → 按"优先级分级规则"判定后补齐
+- **优先级标注自检（强制）**: 生成完每个模块的全部用例后，逐个检查每个叶子 step（含 children 内）是否有 `level` 字段且取值 ∈ {`P0`, `P1`, `P2`}。命中以下任一情况视为缺陷，立即修正后再进入 Step 3 去重：
+  - 字段缺失或为空 → 按"优先级分级规则"判定后补齐（缺省视为 `P1`）；分组 step（`group: true`）本身不写 `level`
   - 取值不在枚举内（例如 `P3` / `high` / `1`）→ 修正为合法枚举
-  - 某 `F-xxx` 功能下没有任何 `priority: P0` 用例 → 回查该功能的核心成功路径用例，将其升档为 P0；若该功能本身不存在核心成功路径用例（仅有规则校验/异常路径），在 findings.md 记录理由并将最贴近主流程的用例升为 P0
-  - 安全/鉴权/资金/数据完整性/不可逆操作场景的用例标为 P1 或 P2 → 升档为 P0（除非有明确理由，并在 findings.md 记录）
-  - 模块内所有用例同档（例如全 P1）→ 重新按"业务影响 × 触发概率"分布；若确实无法分散（如纯校验规则集），在 findings.md 记录理由
-  - matrix row 的 `priority` 高于父级 → 拆为独立 `single` 用例（参见"matrix row 粒度自检"思路），或将该 row 降到父级以下
-  - scenario_chain 的 `branches[].priority` 高于主链 `priority` → 同上处理
+  - 某 `F-xxx` 功能下没有任何含 `level: P0` 叶子 step 的用例 → 回查该功能的核心成功路径用例，将其主路径叶子 step 升档为 P0；若该功能本身不存在核心成功路径用例（仅有规则校验/异常路径），在 findings.md 记录理由并将最贴近主流程的叶子 step 升为 P0
+  - 安全/鉴权/资金/数据完整性/不可逆操作场景的叶子 step 标为 P1 或 P2 → 升档为 P0（除非有明确理由，并在 findings.md 记录）
+  - 模块内所有叶子 step 同档（例如全 P1）→ 重新按"业务影响 × 触发概率"分布；若确实无法分散（如纯校验规则集），在 findings.md 记录理由
 生成时优先遵循：
 - 精准覆盖优于平均铺开
 - 可验证优于抽象描述
@@ -358,7 +362,7 @@ description: Use when generating functional test cases from confirmed requiremen
 高价值资产保护规则：
 - 如果一个用例包含关键规则、完整枚举、关键内容校验、状态/数据断言、集成异常或证据链，则不能因为"主流程相似"被直接吞并
 - 如果两条用例行为相似，但观测面不同，则视为不同用例
-- 矩阵聚合不是去重 —— 它把 N 条 `single` 折叠为 1 条 `matrix` + N 个 `rows`，**row 数 = 原候选数**，零信息丢失。聚合后 row 中的 `expected` 逐字文案、`source` 溯源、`verbatim` 标记一个都不能少
+- 矩阵聚合不是去重 —— 它把 N 条 `single` 折叠为 1 条 `matrix`（分组 step）+ N 个 children 叶子 step，**children 叶子 step 数 = 原候选数**，零信息丢失。聚合后叶子 step 中的 `result` 逐字文案、`source` 溯源、`verbatim` 标记一个都不能少
 - "代表值用例"不能替代"完整规则列表本身是需求"的情况
 
 合并规则：
@@ -368,7 +372,7 @@ description: Use when generating functional test cases from confirmed requiremen
 - 行为用例与证据链用例不互相吞并
 - 触发 `mergeable_matrix` 的候选必须聚合，**不允许以"保持可读性"为由放弃聚合**
 
-去重 + 聚合报告写入 `.supertester/test-cases/deduplication-report.md`，对每条 `mergeable_matrix` 记录：合并前的候选 TC-id 列表 → 合并后的 matrix TC-id + group 名 + row 数
+去重 + 聚合报告写入 `.supertester/test-cases/deduplication-report.md`，对每条 `mergeable_matrix` 记录：合并前的候选 TC-id 列表 → 合并后的 matrix TC-id + 分组 step 组名 + children 叶子 step 数
 
 ### Step 4: test-reviewer 审查
 
@@ -387,15 +391,14 @@ description: Use when generating functional test cases from confirmed requiremen
   - 每个"视觉验收项"是否有对应的独立用例，且验证方式显式标注为 `manual_visual_check` 或 `screenshot_comparison`？
   - 每个"合约/规则项"是否有专门的规则级验证用例（验证规则配置本身的正确性），而非仅被行为用例间接覆盖？
   - 任何未覆盖项标记为 CRITICAL 级别问题，要求补充后才能通过审查
-- **优先级分级核验（强制）**：逐条检查 `priority` 字段是否存在且 ∈ {P0, P1, P2}；以模块为粒度核查以下规则——
-  - 每个 `F-xxx` 是否至少有 1 条 P0 用例覆盖其核心成功路径？缺失 → **HIGH**
-  - 安全/鉴权/资金/数据完整性/不可逆操作场景的用例是否标为 P0？标为 P1/P2 且 findings.md 无理由 → **HIGH**
-  - 是否存在某模块所有用例同档（全 P0 / 全 P1 / 全 P2）？同档 → **HIGH**（除非 findings.md 有明确理由）
-  - matrix row / scenario_chain branches 是否存在 row/branch 优先级高于父级？存在 → **MEDIUM**，要求拆为独立 single 或降到父级以下
-  - 行级覆盖后的有效优先级分布是否在 meta.priority_row_distribution 中反映准确？不准确 → **MEDIUM**
-- **用例自包含独立性核验（强制）**：随机抽样至少 30% 的用例（含 single / matrix / scenario_chain 各至少 3 条），按"假装从未读过任何需求文档"的视角逐条阅读 `title` / `action` / `steps` / `expected` / `key_assets` / `preconditions`。命中以下任一情况即标记 CRITICAL 级问题：
-  - 内容字段中出现**任何**内部代号——无论是代号承担语义主体（`expected: C-005` / `steps: 观察 F-005/F-006/F-007 字段` / `preconditions: 该账号 S-003 = true`），还是代号只作括号溯源尾巴（`限流功能(F-006)` / `「文案」(C-011)` / `key_assets: [...(对应 CMS-020)]`）。内容字段必须零代号
-  - `title` 无法独立表达验证目标，或结尾带 `(代号…)` 括号尾巴
+- **优先级分级核验（强制）**：逐个检查每个叶子 step（含 children 内）的 `level` 字段是否存在且 ∈ {P0, P1, P2}；以模块为粒度核查以下规则——
+  - 每个 `F-xxx` 是否至少有 1 条含 `level: P0` 叶子 step 的用例覆盖其核心成功路径？缺失 → **HIGH**
+  - 安全/鉴权/资金/数据完整性/不可逆操作场景的叶子 step 是否标为 P0？标为 P1/P2 且 findings.md 无理由 → **HIGH**
+  - 是否存在某模块所有叶子 step 同档（全 P0 / 全 P1 / 全 P2）？同档 → **HIGH**（除非 findings.md 有明确理由）
+  - `meta.level_distribution`（按 case 取最高 level）/ `meta.level_step_distribution`（按叶子 step 计数）是否与实际分布一致？不准确 → **MEDIUM**
+- **用例自包含独立性核验（强制）**：随机抽样至少 30% 的用例（含 single / matrix / scenario_chain 各至少 3 条），按"假装从未读过任何需求文档"的视角逐条阅读 `case_name` / `precondition` / `steps[].action` / `steps[].result` / `steps[].children[].action` / `steps[].children[].result` / `key_assets`。命中以下任一情况即标记 CRITICAL 级问题：
+  - 内容字段中出现**任何**内部代号——无论是代号承担语义主体（`result: C-005` / `action: 观察 F-005/F-006/F-007 字段` / `precondition: 该账号 S-003 = true`），还是代号只作括号溯源尾巴（`限流功能(F-006)` / `「文案」(C-011)` / `key_assets: [...(对应 CMS-020)]`）。内容字段必须零代号
+  - `case_name` 无法独立表达验证目标，或结尾带 `(代号…)` 括号尾巴
   - 阅读用例时需要回查 `parsed-requirements.md` / `cross-module-scenarios.md` / `implicit-requirements.md` 才能理解任一字段
 
   CRITICAL 项一律要求生成方按"内部代号自包含自检"规则逐字段修复后重新提审：**补全语义 + 删除内容字段中的代号 + 把代号搬到 `feature`/`sub_refs`/`sources`/row `source` 溯源字段**；不允许只删代号丢语义，也不允许保留括号代号尾巴
@@ -405,9 +408,9 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 ### Step 5: 用户确认
 
 向用户展示：
-- **用例统计**：原始候选数 vs 聚合/去重后用例数 vs 执行点数（matrix rows + single + scenario_chain steps 合计）
-- **按 type 分类**：single 数 / matrix 数（含 group/row 分布）/ scenario_chain 数
-- **按优先级分类**：P0 / P1 / P2 各档数量（按 type 维度），以及行级覆盖后的有效优先级分布；按模块给出 P0 用例清单（用户最关心阻塞级）
+- **用例统计**：原始候选数 vs 聚合/去重后用例数 vs 叶子步骤数（所有 case 的叶子 step 含 children 叶子合计）
+- **按 type 分类**：single 数 / matrix 数（含分组 step / children 叶子分布）/ scenario_chain 数
+- **按优先级分类**：`meta.level_distribution`（按 case 取最高 level）与 `meta.level_step_distribution`（按叶子 step 计数）各档数量；按模块给出含 P0 叶子 step 的用例清单（用户最关心阻塞级）
 - 按模块分组的用例列表（含矩阵聚合摘要）
 - 审查结果摘要
 
@@ -426,18 +429,20 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 
 **载体**：单一 YAML 文件 `.supertester/test-cases/functional-cases.yaml` 作为机器可读的唯一来源真理。所有下游 skill（automation-analysis / automation-scripting / test-reporting）和外部测试管理系统入库均从此文件解析。
 
+**字段命名对齐既有用例库**：所有用例统一通过一个 `steps` 列表表达，每个叶子 step 是 `{action, result, level}`；分组（原 matrix 的 groups/rows）通过 `group: true` + `children` 表达，**没有 `groups` / `rows` / `branches` 字段**。优先级 `level` 只挂在叶子 step 上，**没有用例级 `priority` 字段**。
+
 ### 顶层结构
 
 ```yaml
 meta:
   module: <模块名>
-  total_cases: <用例数 N>      # type 维度总数
-  total_rows: <执行点数 M>     # matrix rows + single + scenario_chain 之和
-  priority_distribution:       # 按 type 维度统计；matrix/scenario_chain 以父级 priority 计入
+  total_cases: <用例数 N>           # case 维度总数
+  total_steps: <叶子步骤数 M>       # 所有 case 的叶子 step 数（含 children 叶子）之和
+  level_distribution:              # 按 case 维度：每条 case 取其全部叶子 step 的最高 level 归档
     P0: <数量>
     P1: <数量>
     P2: <数量>
-  priority_row_distribution:   # 按执行点维度统计（含 matrix rows 与 branches 覆盖后的有效优先级）
+  level_step_distribution:         # 按叶子 step 维度逐个计数
     P0: <数量>
     P1: <数量>
     P2: <数量>
@@ -450,89 +455,104 @@ cases:
   ...
 ```
 
+### 通用字段约定（所有 type）
+
+- `id`: 用例 ID (TC-xxx)，保留作内部溯源（你的用例库可忽略）
+- `case_name`: 用例名称，**去掉编号前缀**，一句话独立可读、零代号（原 `title`）
+- `type`: `single` | `matrix` | `scenario_chain`，作为语义标签保留（matrix 现仅表示"含分组 step"）
+- `precondition`: 前置条件，**字符串**（多条用 `|` block scalar + `1. 2. 3.`）；无则空字符串 `""`（原 `preconditions` 列表）
+- `steps`: 步骤列表，叶子 step = `{action, result, level}`，分组 step = `{action: <组名>, group: true, result: "", children: [<叶子 step>]}`
+- `level`: 优先级，**仅写在叶子 step 上**，取值 `P0` / `P1` / `P2`，默认 `P1`；分组 step（`group: true`）不写 `level`，由 children 汇总。用例有效 level = 其全部叶子 step 的**最高档**
+
 ### type: single 示例
 
 ```yaml
 - id: TC-027
-  title: 手机号修改 → 同步至账户安全手机
+  case_name: 手机号修改同步至账户安全手机
   type: single
   module: 免费会员信息确认
   feature: F-003
   sub_refs: [CMS-001, CL-012, CTX-B]   # 代号都进溯源字段，内容字段保持干净
-  priority: P0    # 数据完整性 + 跨模块状态契约 → 阻塞级
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
   automation: automatable
-  preconditions:
-    - 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
-    - 账户安全手机原值 = "13800000000"
-    - 用户输入手机号 = "13911111111"（已修改）
+  precondition: |
+    1. 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
+    2. 账户安全手机原值 = "13800000000"，用户输入手机号 = "13911111111"（已修改）
   steps:
-    - 进入信息确认页
-    - 提交表单
-  expected:
-    - 账户安全手机字段 = "13911111111"
-    - VO 公司信息中手机号 = "13911111111"
+    - action: 进入信息确认页并提交表单
+      result: |
+        1. 账户安全手机字段 = "13911111111"
+        2. VO 公司信息中手机号 = "13911111111"
+      level: P0    # 数据完整性 + 跨模块状态契约 → 阻塞级
   sources:
     - { file: requirements.md, lines: "15", text: "手机若修改则同步至账户信息的安全手机" }
   key_assets:
     - 账户同步契约
 ```
 
-### type: matrix 示例
+### type: matrix 示例（分组 = group:true + children，无 groups/rows）
 
 ```yaml
 - id: TC-043
-  title: 手机号字段校验矩阵
+  case_name: 手机号字段校验矩阵
   type: matrix
   module: 免费会员信息确认
   feature: F-005
-  sub_refs: [C-004, C-005, E-001, CTX-B]   # key_assets/preconditions 里删掉的代号在此登记
-  priority: P1             # 父级；输入校验关键规则集 → 重要级；row 可单独降档
+  sub_refs: [C-004, C-005, E-001, CTX-B]   # key_assets/precondition 里删掉的代号在此登记
   verification_method: ui_text_assertion
   evidence_types: [UI, External]
-  automation: partial      # 父级；row 可单独覆盖
-  preconditions:
-    - 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
+  automation: partial      # 父级默认；叶子 step 可单独覆盖
+  precondition: 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
   key_assets:
     - 必填文案「请填写手机号」逐字断言
     - 校验失败文案「请填写正确的手机号」逐字断言
     - 区号默认值映射完整枚举：大陆/国外→+86，香港→+852，澳门→+853，台湾→+886
-  groups:
-    - name: IP 归属 → 默认区号
-      rows:
+  steps:
+    - action: IP 归属 → 默认区号        # 组名
+      group: true
+      result: ""                       # 分组节点 result 可空
+      children:
         - action: 模拟 IP = 中国大陆，进入信息确认页
-          expected: 区号下拉默认显示 "+86"
+          result: 区号下拉默认显示 "+86"
+          level: P1
           source: L35
         - action: 模拟 IP = 中国香港，进入信息确认页
-          expected: 区号下拉默认显示 "+852"
+          result: 区号下拉默认显示 "+852"
+          level: P1
           source: L36
         - action: 模拟 IP = 中国澳门，进入信息确认页
-          expected: 区号下拉默认显示 "+853"
+          result: 区号下拉默认显示 "+853"
+          level: P1
           source: L37
         - action: 模拟 IP = 中国台湾，进入信息确认页
-          expected: 区号下拉默认显示 "+886"
+          result: 区号下拉默认显示 "+886"
+          level: P1
           source: L38
         - action: 模拟 IP 识别失败
-          expected: 默认 "+86"（推测）
+          result: 默认 "+86"（推测）
+          level: P2   # 罕见且推测 → 次要级
           source: IR-009
           status: blocked
-          priority: P2   # 罕见且推测 → 降为次要级
 
-    - name: 长度 × 区号
-      rows:
+    - action: 长度 × 区号
+      group: true
+      result: ""
+      children:
         - action: |
             1. 区号选择 +86
             2. 手机号输入 "13800001234"（11 位纯数字）
             3. 提交
-          expected: 校验通过，无「请填写正确的手机号」错误提示
+          result: 校验通过，无「请填写正确的手机号」错误提示
+          level: P1
           source: L41
           automation: automatable
         - action: |
             1. 区号选择 +86
             2. 手机号输入 "1380000abc"（含字母）
             3. 提交
-          expected: 逐字显示「请填写正确的手机号」
+          result: 逐字显示「请填写正确的手机号」
+          level: P1
           source: L41
           verbatim: true
           automation: automatable
@@ -540,67 +560,66 @@ cases:
             1. 区号选择 +852
             2. 手机号输入 "12345678"（8 位数字）
             3. 提交
-          expected: 校验通过
+          result: 校验通过
+          level: P1
           source: L41
           automation: automatable
 
-    - name: 必填
-      rows:
+    - action: 必填
+      group: true
+      result: ""
+      children:
         - action: 手机号留空，提交
-          expected: 逐字显示「请填写手机号」
+          result: 逐字显示「请填写手机号」
+          level: P1
           source: L40
           verbatim: true
           automation: automatable
+  sources:
+    - { file: requirements.md, lines: "35-41" }
 ```
 
-### type: scenario_chain 示例
+### type: scenario_chain 示例（无 branches；分支/恢复路径拆为独立用例）
 
 ```yaml
 - id: TC-029
-  title: 提交期间网络中断后重试 → 幂等不双写
+  case_name: 提交期间网络中断后重试 — 幂等不双写
   type: scenario_chain
   module: 免费会员信息确认
   feature: F-003
   sub_refs: [CMS-020, CTX-B]
-  priority: P0    # 数据完整性 + 不可逆写入幂等 → 阻塞级
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
   automation: partial
-  preconditions:
-    - 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
+  precondition: 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
   steps:
-    - |
-      1. 用户修改手机号
-      2. 点击提交
-      3. 注入网络中断
-      4. 网络恢复后用户再次点击提交
-  expected:
-    - 后端只接收到一次写入请求（不论客户端重试多少次）
-    - 账户安全手机更新只发生一次
-    - VO 公司信息中手机号 = 最新输入值
+    - action: |
+        1. 用户修改手机号
+        2. 点击提交
+        3. 注入网络中断
+        4. 网络恢复后用户再次点击提交
+      result: |
+        1. 后端只接收到一次写入请求（不论客户端重试多少次）
+        2. 账户安全手机更新只发生一次
+        3. VO 公司信息中手机号 = 最新输入值
+      level: P0    # 数据完整性 + 不可逆写入幂等 → 阻塞级
   sources:
     - { file: requirements.md, lines: "18-19" }
   key_assets:
     - 提交操作幂等性契约：相同手机号变更请求多次到达后端，只产生一次写入
-  branches:
-    - name: 网络恢复后提交失败
-      priority: P1   # 错误恢复分支；可低于主链 P0
-      steps:
-        - 网络恢复但服务端返回 5xx
-      expected:
-        - 用户看到失败提示
-        - 数据未被部分写入
 ```
+
+> **分支/恢复路径已不再用 `branches` 字段表达**。主链之外的替代路径、错误恢复路径，每条单独拆成一条独立用例（同 `feature` / 同 `sub_refs`，`case_name` 标明分支语义，如"提交期间网络中断后重试 — 网络恢复后服务端 5xx 失败处理"），用自己的 `precondition` + `steps` 完整描述。
 
 ### YAML 书写硬规则
 
-1. **`action` / `expected` 的多步内容必须用 `|` block scalar + 数字前缀**（`1.` `2.` `3.`），不允许使用 nested list（`-` 列表）—— 不同 YAML 解析器对嵌套列表的语义不一致，会导致入库踩坑
-2. **`source` 单行字符串**（如 `L35` / `IR-009` / `CMS-028 第3条`），禁止空值
-3. **`verbatim: true`** 的 row 表示 `expected` 中引号 `「」` 或双引号内的文案需逐字断言，自动化脚本不得参数化、不得改写
-4. **`status: blocked`** 的 row 表示需求未明确或被阻塞，必须配合 `source` 指向 IR-xxx 或 findings.md 中的待澄清记录
-5. **逐字断言写文案本身、零代号**：`expected: C-005` 与 `expected: 逐字显示「请填写正确的手机号」(C-005)` 都是错误写法（前者代号占位，后者括号代号尾巴污染语句）；必须写 `expected: 逐字显示「请填写正确的手机号」`，代号 C-005 登记到 row 的 `source` 或父用例 `sub_refs`
-6. **`groups[].name` 必须有业务语义**，不允许写 "分组1" "分组2" —— 应当反映分组维度（如 "IP 归属 → 默认区号" / "长度 × 区号" / "必填"）
-7. **`priority` 字段必填且取值受限**：每条用例（single / matrix / scenario_chain）必须显式写 `priority`，取值只能是 `P0` / `P1` / `P2`；matrix row 的 `priority` 与 scenario_chain branches 的 `priority` 可选但不得高于父级；不允许出现 `P3` / `high` / `1` / `Blocker` 等非枚举值
+1. **`action` / `result` 的多步内容必须用 `|` block scalar + 数字前缀**（`1.` `2.` `3.`），不允许使用 nested list（`-` 列表）—— 不同 YAML 解析器对嵌套列表的语义不一致，会导致入库踩坑
+2. **`source` 单行字符串**（如 `L35` / `IR-009` / `CMS-028 第3条`），禁止空值；它是叶子 step 的纯溯源字段，承载行级代号
+3. **`verbatim: true`** 的叶子 step 表示 `result` 中引号 `「」` 或双引号内的文案需逐字断言，自动化脚本不得参数化、不得改写
+4. **`status: blocked`** 的叶子 step 表示需求未明确或被阻塞，必须配合 `source` 指向 IR-xxx 或 findings.md 中的待澄清记录
+5. **逐字断言写文案本身、零代号**：`result: C-005` 与 `result: 逐字显示「请填写正确的手机号」(C-005)` 都是错误写法（前者代号占位，后者括号代号尾巴污染语句）；必须写 `result: 逐字显示「请填写正确的手机号」`，代号 C-005 登记到该叶子 step 的 `source` 或父用例 `sub_refs`
+6. **分组 step 的 `action`（组名）必须有业务语义**，不允许写 "分组1" "分组2" —— 应当反映分组维度（如 "IP 归属 → 默认区号" / "长度 × 区号" / "必填"）；分组 step 必须带 `group: true`，`result` 可空，children 中每个叶子 step 自带 `result` + `level` + `source`
+7. **`level` 字段写在叶子 step 上、取值受限**：每个叶子 step（含 children 内）必须有 `level`，取值只能是 `P0` / `P1` / `P2`（缺省视为 `P1`）；分组 step（`group: true`）不写 `level`；不允许出现 `P3` / `high` / `1` / `Blocker` 等非枚举值。用例有效 level 由其叶子 step 最高档汇总，写入 `meta.level_distribution`
 
 ## 2-Action Rule 落地
 
@@ -618,18 +637,18 @@ cases:
 | "用例太多了" | 数量不等于质量。精准覆盖 > 全面铺开 |
 | "有主流程就算覆盖了" | 如果缺少规则、状态、集成或证据链覆盖，仍然会遗漏高价值测试点 |
 | "代表值足够了" | 当完整列表、矩阵或约束本身是需求时，代表值不能替代完整覆盖 |
-| "矩阵聚合会让用例变难读" | matrix 用例的 row 是显式枚举，零信息丢失，反而更利于审阅和入库 |
-| "matrix 用例的 row 可以省略 source" | row 级 source 是溯源链的最小单位，缺失等于该 row 未对齐需求 |
+| "矩阵聚合会让用例变难读" | 分组 step 的 children 叶子 step 是显式枚举，零信息丢失，反而更利于审阅和入库 |
+| "children 叶子 step 可以省略 source" | 叶子 step 级 source 是溯源链的最小单位，缺失等于该叶子 step 未对齐需求 |
 | "verbatim 标记可有可无" | 没有 verbatim 标记，自动化脚本就敢做文案变量化，逐字断言资产会被悄悄抹平 |
 | "用 C-005/E-001/CTX-B 代号更简洁" | 用例必须脱离 parsed-requirements.md 独立可执行可入库；内容字段零代号，代号搬到 feature/sub_refs/sources 溯源字段 |
 | "在文案后挂个 (C-011) 做溯源没坏处" | 括号代号尾巴会污染读者对用例的理解、打乱语句语义；内容字段一律删干净，溯源由 sources/sub_refs 承载 |
-| "title 后面跟一串 (CMS-024 / IR-038 / A-7) 看起来很专业" | 标题必须独立成句、零代号；结尾的代号串既不专业也读不懂，删掉搬进 feature/sub_refs |
+| "case_name 后面跟一串 (CMS-024 / IR-038 / A-7) 看起来很专业" | 用例名称必须独立成句、零代号；结尾的代号串既不专业也读不懂，删掉搬进 feature/sub_refs |
 | "步骤里写 'F-005/F-006/F-007 字段' 更精简" | 执行者不会回查需求才点开页面；字段必须写中文名（"姓名/出生年月/性别"），不挂代号 |
 | "S-003/A-7 是项目内部公认的简写" | 用例的目标读者还包括外部测试管理系统、新加入的执行者、未来的自动化脚本作者；任何代号都不是"公认"的，内容字段里都得删 |
 | "全部标 P1 最稳妥" | 全档一致 = 未做分级，列为 HIGH 问题；执行团队拿不到"先跑哪条"的信号 |
-| "支付/鉴权用例先标 P1，后面再升 P0" | 安全/资金/数据完整性默认 P0，不允许默认降级；这条用例的 priority 在生成时就要写对 |
-| "matrix 某条罕见 row 比父级更关键，标更高优先级" | row 不允许升档（拆为独立 single 用例承载更高优先级），否则父级 priority 失去聚合语义 |
-| "priority 让 reviewer 加就行了" | 生成阶段必须自带 priority；reviewer 只核验是否合理，不负责补字段 |
+| "支付/鉴权用例先标 P1，后面再升 P0" | 安全/资金/数据完整性默认 P0，不允许默认降级；该叶子 step 的 level 在生成时就要写对 |
+| "分组 step 自己也标个 level 更清楚" | level 只挂在叶子 step（含 children）上；分组 step（group:true）不写 level，用例有效 level 由叶子 step 最高档汇总 |
+| "level 让 reviewer 加就行了" | 生成阶段每个叶子 step 必须自带 level；reviewer 只核验是否合理，不负责补字段 |
 | "自包含规则我自己扫一遍就行" | LLM 自检已被多次证明会漂移；`scripts/check-self-contained.py` 是唯一权威。退出码不为 0 时不允许进入 Step 3、不允许提交给 reviewer、不允许 Stop |
 | "校验器报的这条不算真违规，跳过" | 校验器是确定性规则的执行者，不接受个例豁免。要么按规则补全语义，要么把代号挪到 `feature` / `sub_refs` / `sources` 三个纯溯源字段 |
 | "把校验器输出删掉就过了" | hook 会在每次 Write/Edit 后重跑校验并重新注入违规清单；Stop hook 也会基于文件实际内容阻塞，不读注释 |
@@ -642,7 +661,7 @@ cases:
 - 多证据类型功能已体现多观测面验证
 - 复杂组合规则已通过 `scenario_chain` 或 `matrix` 方式保留
 - 同字段/同规则多分区已聚合为 `type: matrix`，不存在零散派生的 single 群
-- 每条用例都显式标注 `priority` 且取值 ∈ {P0, P1, P2}；每个 F-xxx 至少有 1 条 P0；安全/鉴权/资金/数据完整性场景已落到 P0；模块内不存在全档一致（除 findings.md 已记录理由的特例）
-- `functional-cases.yaml` 通过 YAML 语法校验，且 meta.priority_distribution / priority_row_distribution 与实际用例分布一致
-- **`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py .supertester/test-cases/functional-cases.yaml` 退出码为 0**（0 处自包含违规）。任何 `code-carries-meaning` / `title-empty` / `title-body-too-short` 命中都会让 PostToolUse hook 在 `<SELF-CONTAINMENT-VIOLATIONS>` 块中持续提示、并让 Stop hook 阻塞工作流终止，必须先内嵌代号背后的实际语义再重跑校验
+- 每个叶子 step 都显式标注 `level` 且取值 ∈ {P0, P1, P2}；每个 F-xxx 至少有 1 条含 P0 叶子 step 的用例；安全/鉴权/资金/数据完整性场景的叶子 step 已落到 P0；模块内不存在全档一致（除 findings.md 已记录理由的特例）
+- `functional-cases.yaml` 通过 YAML 语法校验，且 meta.level_distribution / level_step_distribution 与实际分布一致
+- **`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py .supertester/test-cases/functional-cases.yaml` 退出码为 0**（0 处自包含违规）。任何 `code-in-content-field` / `case-name-empty` 命中都会让 PostToolUse hook 在 `<SELF-CONTAINMENT-VIOLATIONS>` 块中持续提示、并让 Stop hook 阻塞工作流终止，必须先内嵌代号背后的实际语义再重跑校验
 - reviewer 已确认不存在明显的覆盖维度缺口

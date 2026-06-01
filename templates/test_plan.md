@@ -54,11 +54,11 @@ Phase 3
 - **Status:** pending
 
 ### Phase 4: 自动化可行性分析
-- [ ] 分析每个测试用例的自动化潜力（matrix 用例逐 row 评估）
+- [ ] 分析每个测试用例的自动化潜力（matrix 用例逐 children 叶子 step 评估）
 - [ ] 标记为 automatable / partial / manual
 - [ ] 说明哪些测试资产不适合完全自动化，需保留人工验证
 - [ ] 生成 automation-analysis.yaml + automation-analysis.md
-- **Completion Gate:** 自动化边界明确（含 row 级），未强行脚本化所有测试资产
+- **Completion Gate:** 自动化边界明确（含叶子 step 级），未强行脚本化所有测试资产
 - **Status:** pending
 
 ### Phase 5: 自动化脚本生成

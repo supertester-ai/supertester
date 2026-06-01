@@ -27,10 +27,10 @@ partition_group:
   verification_method: <枚举>             # 聚合判定的关键键
   evidence_types: [...]                   # 聚合判定的关键键
   preconditions: [...]                    # 聚合判定的关键键
-  group_name: <对应将来 matrix 的 groups[].name>
+  group_name: <对应将来分组 step 的组名（action）>
   rows:
     - action: ...
-      expected: ...
+      result: ...
       source: ...
       verbatim?: true
       status?: blocked | inferred
@@ -98,26 +98,26 @@ partition_group:
   group_name: 邮箱格式校验
   rows:
     - action: 输入 "user@example.com"
-      expected: 校验通过
+      result: 校验通过
       source: L12
     - action: 输入 "user+tag@example.com"
-      expected: 校验通过
+      result: 校验通过
       source: L12
     - action: 留空提交
-      expected: 逐字显示「请填写邮箱」
+      result: 逐字显示「请填写邮箱」
       source: L13
       verbatim: true
     - action: 输入 "user@" (无域名)
-      expected: 逐字显示「邮箱格式不正确」
+      result: 逐字显示「邮箱格式不正确」
       source: L14
       verbatim: true
     - action: 输入 "user@@example.com" (多个 @)
-      expected: 逐字显示「邮箱格式不正确」
+      result: 逐字显示「邮箱格式不正确」
       source: L14
       verbatim: true
 ```
 
-Step 2 接收后：本 group 共 5 条 row 且满足强制触发条件 → 折叠为 `type: matrix` 用例的一个 group；若总 row 数 <3，则拆为 single 用例。
+Step 2 接收后：本 group 共 5 条 row 且满足强制触发条件 → 折叠为 `type: matrix` 用例的一个分组 step（`group: true` + `children`，每条 row 成为一个 children 叶子 step，自带 `action` / `result` / `level` / `source`）；若总 row 数 <3，则拆为 single 用例。
 
 ## 2. 边界值生成器
 
@@ -155,14 +155,14 @@ partition_group:
   group_name: 长度 × 区号
   rows:
     - action: 输入 "1380000123" (10 位)
-      expected: 逐字显示「请填写正确的手机号」
+      result: 逐字显示「请填写正确的手机号」
       source: L41
       verbatim: true
     - action: 输入 "13800001234" (11 位)
-      expected: 校验通过
+      result: 校验通过
       source: L41
     - action: 输入 "138000012345" (12 位)
-      expected: 逐字显示「请填写正确的手机号」
+      result: 逐字显示「请填写正确的手机号」
       source: L41
       verbatim: true
 ```
@@ -241,7 +241,7 @@ partition_group:
 1. 列出所有条件
 2. 列出所有动作
 3. 生成条件组合矩阵
-4. 每条规则（Rule）作为一条 row：`action` 列出该规则下所有条件取值（用 `|` block scalar + `1. 2. 3.`），`expected` 列出对应动作
+4. 每条规则（Rule）作为一条 row（最终成为分组 step 的一个 children 叶子 step）：`action` 列出该规则下所有条件取值（用 `|` block scalar + `1. 2. 3.`），`result` 列出对应动作
 5. 优化：合并无差异的规则（在 group 末尾以注释或独立 row 说明合并依据）
 6. **整体作为一个 partition_group 输出**
 
@@ -265,22 +265,22 @@ partition_group:
     - action: |
         1. C1: 用户是 VIP = true
         2. C2: 订单金额 ≥ 100 = true
-      expected: 折扣 = 20%；展示 "VIP 满减"
+      result: 折扣 = 20%；展示 "VIP 满减"
       source: L88
     - action: |
         1. C1: 用户是 VIP = true
         2. C2: 订单金额 ≥ 100 = false
-      expected: 折扣 = 10%；展示 "VIP 普通折扣"
+      result: 折扣 = 10%；展示 "VIP 普通折扣"
       source: L89
     - action: |
         1. C1: 用户是 VIP = false
         2. C2: 订单金额 ≥ 100 = true
-      expected: 折扣 = 5%；展示 "满减促销"
+      result: 折扣 = 5%；展示 "满减促销"
       source: L90
     - action: |
         1. C1: 用户是 VIP = false
         2. C2: 订单金额 ≥ 100 = false
-      expected: 无折扣
+      result: 无折扣
       source: L91
 ```
 

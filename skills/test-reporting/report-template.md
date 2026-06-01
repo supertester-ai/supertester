@@ -53,23 +53,23 @@
 |-------|------|-----------|----------------|----------|
 | TC-001 | [name] | Equivalence | content_fidelity_mode | P0 |
 
-Priority values must be `P0` / `P1` / `P2` taken directly from `functional-cases.yaml`. Do not invent alternative labels (High/Medium/Low).
+Priority values must be `P0` / `P1` / `P2` taken from each case's effective level (the highest `level` among its leaf steps) in `functional-cases.yaml`. Do not invent alternative labels (High/Medium/Low).
 
 **Total by module:** N test cases
 
 ## Priority Distribution
 
-| Level | Case Count | Case % | Row Count (incl. matrix rows) | Row % |
-|-------|-----------|--------|-------------------------------|-------|
+| Level | Case Count (effective) | Case % | Leaf-step Count (incl. children) | Step % |
+|-------|-----------------------|--------|----------------------------------|--------|
 | P0 | N | X% | N' | X% |
 | P1 | N | X% | N' | X% |
 | P2 | N | X% | N' | X% |
 
 ### P0 Cases (must-fix-before-release)
 
-| TC ID | Module | Title | Automation | Coverage |
-|-------|--------|-------|------------|----------|
-| TC-001 | [module] | [title] | automatable | covered |
+| TC ID | Module | Case Name | Automation | Coverage |
+|-------|--------|-----------|------------|----------|
+| TC-001 | [module] | [case_name] | automatable | covered |
 
 ### Priority × Automation Cross-Tab
 
