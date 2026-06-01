@@ -29,11 +29,11 @@ functional-cases.yaml + automation-analysis.yaml
     |
     +---> type: single (automatable/partial) -> 单个 test() 块
     |
-    +---> type: matrix -> test.describe + 参数化数据驱动
+    +---> type: matrix -> test.describe + 参数化数据驱动（分组 step → describe，children 叶子 step → test）
     |
-    +---> type: scenario_chain -> 单个 test()，branches 可选展开
+    +---> type: scenario_chain -> 单个 test()，按 steps[] 顺序编排（无 branches）
     |
-    +---> manual 用例 / matrix 中的 manual row -> manual-cases.md
+    +---> manual 用例 / matrix 中 manual 的 children 叶子 step -> manual-cases.md
     |
     v
 test-reviewer 审查 -> reviews/review-scripts-*.md
@@ -58,22 +58,22 @@ test-reviewer 审查 -> reviews/review-scripts-*.md
   ```
 
 ### type: matrix
-- 编译为 `test.describe` 包裹的参数化测试，每个 `group` 一个 describe，每个 row 一个 test
-- 共享前置条件用 `test.beforeEach` 实现
-- row 数据从 YAML 中提取为 `const rows = [...]` 数组，用 `for (const row of rows)` 或 `test.each(rows)` 展开
-- **`verbatim: true` 的 row 必须使用 `toHaveText` 精确断言**（非 `toContainText`），且断言字符串不允许变量化
-- `automation: manual` 的 row 跳过，仅在 manual-cases.md 中列出（注释引用对应 group 和 row 索引）
-- `automation: partial` 的 row 生成代码 + `HUMAN VERIFICATION NEEDED` 标记
+- 编译为 `test.describe` 包裹的参数化测试，每个分组 step（`group: true`）一个 describe，每个 children 叶子 step 一个 test
+- 共享前置条件（`precondition`）用 `test.beforeEach` 实现
+- children 叶子 step 数据从 YAML 中提取为 `const rows = [...]` 数组（每项含 `action` / `result` / `source` / `verbatim`），用 `for (const row of rows)` 或 `test.each(rows)` 展开
+- **`verbatim: true` 的叶子 step 必须使用 `toHaveText` 精确断言**（非 `toContainText`），且断言字符串不允许变量化
+- `automation: manual` 的叶子 step 跳过，仅在 manual-cases.md 中列出（注释引用对应分组 step 组名和叶子 step 索引）
+- `automation: partial` 的叶子 step 生成代码 + `HUMAN VERIFICATION NEEDED` 标记
 
 ### type: scenario_chain
-- 生成单个 `test()` 块，按 `steps[]` 顺序编排
-- `branches[]` 中的替代/错误路径生成独立 `test()`，与主路径同处一个 `test.describe`
+- 生成单个 `test()` 块，按 `steps[]` 顺序编排（每个叶子 step 的 `action` → 操作，`result` → 断言）
+- 替代/错误路径已在 Phase 3 拆为独立用例（不再有 `branches`），各自生成自己的 `test()`
 
 ### manual 用例
 - 不生成任何代码
 - 写入 `.supertester/scripts/manual-cases.md`
 - 包含详细的人工执行步骤
-- matrix 中的 manual row 需注明所属父用例 ID + group 名 + row 索引
+- matrix 中 manual 的 children 叶子 step 需注明所属父用例 ID + 分组 step 组名 + 叶子 step 索引
 
 ## 代码规范
 
@@ -83,7 +83,7 @@ test-reviewer 审查 -> reviews/review-scripts-*.md
 - 文件头部注释包含模块信息和生成时间
 
 ### 溯源注释
-每个 test 必须标记溯源。对 matrix 用例，**row 级溯源也必须保留**:
+每个 test 必须标记溯源。对 matrix 用例，**children 叶子 step 级溯源也必须保留**:
 
 ```typescript
 // TC-001 | F-001 | <source-file>:<line-range>
@@ -91,10 +91,10 @@ test('should ...', async ({ page }) => {
   // ...
 });
 
-// matrix 用例: row 级溯源放进数据数组
+// matrix 用例: children 叶子 step 级溯源放进数据数组
 const rows = [
-  { action: '...', expected: '...', source: 'L35', verbatim: false },
-  { action: '...', expected: '...', source: 'L41', verbatim: true },
+  { action: '...', result: '...', source: 'L35', verbatim: false },
+  { action: '...', result: '...', source: 'L41', verbatim: true },
 ];
 ```
 
@@ -177,7 +177,7 @@ test('should display welcome elements after login', async ({ page }) => {
 // TC-043 | F-005 | requirements.md:35-41
 test.describe('TC-043 手机号字段校验矩阵', () => {
   test.beforeEach(async ({ page }) => {
-    // 共享前置条件 (preconditions: CTX-B)
+    // 共享前置条件 (precondition)
     await page.goto('/member/confirm');
   });
 
@@ -185,11 +185,11 @@ test.describe('TC-043 手机号字段校验矩阵', () => {
     // verbatim:true 的 row 必须用精确字符串断言 (toHaveText)，不允许变量化
     const rows = [
       { action: '+86, 11 位纯数字', input: '13800001234', region: '+86',
-        expected: { pass: true }, source: 'L41' },
+        result: { pass: true }, source: 'L41' },
       { action: '+86, 含字母', input: '1380000abc', region: '+86',
-        expected: { errorText: '请填写正确的手机号' }, source: 'L41', verbatim: true },
+        result: { errorText: '请填写正确的手机号' }, source: 'L41', verbatim: true },
       { action: '+852, 8 位', input: '12345678', region: '+852',
-        expected: { pass: true }, source: 'L41' },
+        result: { pass: true }, source: 'L41' },
     ];
 
     for (const row of rows) {
@@ -198,12 +198,12 @@ test.describe('TC-043 手机号字段校验矩阵', () => {
         await page.locator('[data-testid="phone-input"]').fill(row.input);
         await page.locator('[data-testid="submit-btn"]').click();
 
-        if (row.expected.pass) {
+        if (row.result.pass) {
           await expect(page.locator('[data-testid="phone-error"]')).toBeHidden();
         } else {
           // verbatim: 必须用 toHaveText 精确断言，不允许 toContainText 局部匹配
           await expect(page.locator('[data-testid="phone-error"]'))
-            .toHaveText(row.expected.errorText!);
+            .toHaveText(row.result.errorText!);
         }
       });
     }
@@ -264,7 +264,7 @@ test.describe('TC-043 手机号字段校验矩阵', () => {
 - 遵循 Playwright 最佳实践
 - 选择器策略稳定 (data-testid > CSS)
 - Arrange-Act-Assert 结构清晰
-- 溯源注释完整 (TC-xxx | F-xxx)，matrix row 内含 row 级 source
+- 溯源注释完整 (TC-xxx | F-xxx)，matrix 数据数组内含 children 叶子 step 级 source
 - partial 用例的 HUMAN VERIFICATION 标记准确
 - matrix 用例：每个 group 编译为 `test.describe`，每个 row 编译为独立 `test()`，row 数与 YAML 一致
 - `verbatim: true` 的 row 使用 `toHaveText` 精确断言，未被参数化或截断

@@ -55,17 +55,15 @@ CODE_PATTERN = re.compile(
 # Fields that are pure traceability — codes are expected here and not scanned.
 TRACEABILITY_ONLY_KEYS = {"feature", "sub_refs", "sources", "source"}
 
-# User-facing content fields on case root that must be code-free.
+# User-facing content fields on the case root that must be code-free. `steps`
+# is scanned recursively, so its nested action / result / children / leaf-step
+# text is covered without any group/branch special-casing.
 ROOT_SCANNED_KEYS = {
-    "title",
-    "preconditions",
+    "case_name",
+    "precondition",
     "steps",
-    "expected",
     "key_assets",
 }
-
-# Matrix row fields that must be code-free.
-MATRIX_ROW_SCANNED_KEYS = {"action", "expected"}
 
 
 def find_violations_in_text(text: str, field_path: str) -> list[dict]:
@@ -119,54 +117,27 @@ def emit_strings(path: str, value, skip_keys: set[str]):
 
 
 def collect_case_fields(case: dict):
-    """Yield (field_path, text) for every scanned text in a case."""
+    """Yield (field_path, text) for every scanned text in a case.
+
+    All content lives under the root content keys; `steps` carries the nested
+    group/children structure and is walked recursively by emit_strings, so no
+    type-specific (groups / rows / branches) handling is needed.
+    """
     for key in ROOT_SCANNED_KEYS:
         if key in case:
             yield from emit_strings(key, case[key], TRACEABILITY_ONLY_KEYS)
 
-    if case.get("type") == "matrix":
-        for gi, group in enumerate(case.get("groups", []) or []):
-            if not isinstance(group, dict):
-                continue
-            name = group.get("name")
-            if isinstance(name, str):
-                yield (f"groups[{gi}].name", name)
-            for ri, row in enumerate(group.get("rows", []) or []):
-                if not isinstance(row, dict):
-                    continue
-                for rk, rv in row.items():
-                    if rk in TRACEABILITY_ONLY_KEYS:
-                        continue
-                    if rk not in MATRIX_ROW_SCANNED_KEYS:
-                        continue
-                    yield from emit_strings(
-                        f"groups[{gi}].rows[{ri}].{rk}",
-                        rv,
-                        TRACEABILITY_ONLY_KEYS,
-                    )
 
-    if case.get("type") == "scenario_chain":
-        for bi, branch in enumerate(case.get("branches", []) or []):
-            if not isinstance(branch, dict):
-                continue
-            for bk, bv in branch.items():
-                if bk in TRACEABILITY_ONLY_KEYS:
-                    continue
-                yield from emit_strings(
-                    f"branches[{bi}].{bk}", bv, TRACEABILITY_ONLY_KEYS
-                )
-
-
-def title_body_issues(case: dict) -> list[dict]:
-    """Flag empty titles. Codes in the title are caught by the content scan."""
-    title = case.get("title")
-    if not isinstance(title, str) or not title.strip():
+def case_name_body_issues(case: dict) -> list[dict]:
+    """Flag empty case names. Codes in the name are caught by the content scan."""
+    name = case.get("case_name")
+    if not isinstance(name, str) or not name.strip():
         return [
             {
-                "field": "title",
+                "field": "case_name",
                 "code": "",
-                "snippet": str(title) if title else "",
-                "rule": "title-empty",
+                "snippet": str(name) if name else "",
+                "rule": "case-name-empty",
             }
         ]
     return []
@@ -178,7 +149,9 @@ RULE_MESSAGES = {
         "把代号背后的实际名称 / 逐字文案 / 状态语义 / 假设描述直接写进字段，删除该代号；"
         "代号只允许出现在 feature / sub_refs / sources / source 四个纯溯源字段中。"
     ),
-    "title-empty": "title 为空——必须用一句话描述本条用例要验证的业务行为。",
+    "case-name-empty": (
+        "case_name 为空——必须用一句话描述本条用例要验证的业务行为（去掉编号前缀）。"
+    ),
 }
 
 
@@ -194,7 +167,7 @@ def validate_case(case: dict) -> list[dict]:
                 code=v["code"], field=field_path
             )
             issues.append(v)
-    for v in title_body_issues(case):
+    for v in case_name_body_issues(case):
         v["case_id"] = case_id
         v["message"] = RULE_MESSAGES[v["rule"]]
         issues.append(v)
@@ -288,8 +261,8 @@ def main() -> int:
                 print(f"    {v['message']}")
                 print()
             print(
-                "修复要求：内容字段（title / preconditions / steps / expected / "
-                "key_assets / matrix rows / branches）必须零代号。把每个代号替代的"
+                "修复要求：内容字段（case_name / precondition / steps[].action / "
+                "steps[].result / steps[].children / key_assets）必须零代号。把每个代号替代的"
                 "实际名称 / 逐字文案 / 状态语义 / 假设描述内嵌进字段并删除代号；机器"
                 "可追踪性由 feature / sub_refs / sources / source 四个纯溯源字段承载。"
                 "修复后重跑本校验直到 0 处违规，再进入下一步。"

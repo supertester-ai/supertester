@@ -91,23 +91,23 @@ For each `F-xxx`, `IR-xxx`, and `CMS-xxx`, report:
 `functional-cases.yaml` is the canonical source. Statistics MUST distinguish two scales:
 
 - **case count**: number of entries in `cases[]` (regardless of `type`)
-- **execution-point count**: `single` cases count as 1; `matrix` cases contribute `sum(groups[].rows.length)`; `scenario_chain` cases count as `1 + branches.length`
+- **execution-point count (leaf-step count)**: sum of leaf steps across all cases — a `single` case contributes its `steps.length`; a `matrix` case contributes the total number of `children` leaf steps across its group steps; a `scenario_chain` case contributes its `steps.length` (there are no `branches` — branch paths are separate cases). Use `meta.total_steps`.
 
 Always report both. A report that only shows case count understates true coverage breadth when matrix cases exist; a report that only shows execution-point count understates the conceptual case count and inflates apparent automation density.
 
-### 1b. Priority (P0/P1/P2) Reporting
+### 1b. Priority (level: P0/P1/P2) Reporting
 
-Priority comes directly from `functional-cases.yaml`. The report MUST surface it explicitly — counts alone (e.g. "total = 80") tell users nothing about release risk.
+Priority comes directly from `functional-cases.yaml`, where `level` lives on each leaf step. A case's effective level = the highest `level` among its leaf steps (`meta.level_distribution`); per-leaf-step counts come from `meta.level_step_distribution`. The report MUST surface it explicitly — counts alone (e.g. "total = 80") tell users nothing about release risk.
 
 Required:
 
-- Top-line `Priority Mix` in Executive Summary (P0 / P1 / P2 percentages at both case and row scales)
-- A dedicated `Priority Distribution` section with case-count and row-count breakdowns
-- A P0 case list with module + title + automation level (this is the "must-fix-before-release" inventory users will scan first)
+- Top-line `Priority Mix` in Executive Summary (P0 / P1 / P2 percentages at both case scale and leaf-step scale)
+- A dedicated `Priority Distribution` section with case-count (effective level) and leaf-step-count breakdowns
+- A P0 case list with module + case_name + automation level (this is the "must-fix-before-release" inventory users will scan first; a case qualifies if it contains any P0 leaf step)
 - A Priority × Automation cross-tab (small 3×3) — surfaces e.g. "5 P0 cases are manual" which is a release-readiness signal
 - The Traceability Matrix and per-module case tables MUST carry a Priority column with literal P0/P1/P2 (not High/Medium/Low)
 
-Do NOT recompute or reclassify priority. If a case is missing `priority` upstream, flag it as a Phase 3 defect rather than guessing a value here.
+Do NOT recompute or reclassify level. If a leaf step is missing `level` upstream, flag it as a Phase 3 defect rather than guessing a value here.
 
 ### 2. Coverage Dimensions
 

@@ -28,7 +28,7 @@ if [ -d ".supertester" ]; then
         validator_out=$(python3 "$script_path" "$yaml_path" --limit 30 2>&1 || true)
         if printf '%s' "$validator_out" | head -1 | grep -q "FAIL"; then
             warn_escaped=$(escape_for_json "$validator_out")
-            warn_block="<SELF-CONTAINMENT-VIOLATIONS>\\n${warn_escaped}\\n\\nHARD GATE: Phase 3 cannot be declared complete and test-reviewer cannot return PASS while any code-in-content-field violation remains. Content fields (title/steps/expected/key_assets/preconditions/matrix rows/branches) must be code-free. Fix each violation by inlining the actual name/copy/state/assumption the code stands for AND deleting the code from the content field (including parenthetical suffixes like 「文案」(C-011)); register the code in feature/sub_refs/sources/source instead. Re-run the validator until 0 violations remain. See skills/test-case-generation/SKILL.md '用例自包含原则' for the rule.\\n</SELF-CONTAINMENT-VIOLATIONS>"
+            warn_block="<SELF-CONTAINMENT-VIOLATIONS>\\n${warn_escaped}\\n\\nHARD GATE: Phase 3 cannot be declared complete and test-reviewer cannot return PASS while any code-in-content-field violation remains. Content fields (case_name/precondition/steps[].action/steps[].result/steps[].children/key_assets) must be code-free. Fix each violation by inlining the actual name/copy/state/assumption the code stands for AND deleting the code from the content field (including parenthetical suffixes like 「文案」(C-011)); register the code in feature/sub_refs/sources/source instead. Re-run the validator until 0 violations remain. See skills/test-case-generation/SKILL.md '用例自包含原则' for the rule.\\n</SELF-CONTAINMENT-VIOLATIONS>"
             context="${context}\\n${warn_block}"
         fi
     fi
