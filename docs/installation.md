@@ -78,10 +78,7 @@ Claude Code 通过插件市场或直接从 git 仓库安装。
 | `using-supertester` | 会话启动自动加载 | 入口 skill，初始化工作流 |
 | `requirement-analysis` | 分析需求文档 | 解析需求 + 澄清模糊项 |
 | `requirement-association` | 分析模块依赖 | 模块依赖 + 跨模块场景 |
-| `test-case-generation` | 生成测试用例 | 功能测试用例生成 |
-| `automation-analysis` | 分析自动化可行性 | 分类为 automatable/partial/manual |
-| `automation-scripting` | 生成自动化脚本 | Playwright E2E 脚本生成 |
-| `test-reporting` | 生成报告 | 聚合所有阶段输出 |
+| `test-case-generation` | 生成测试用例 | 功能测试用例生成（终点产物） |
 
 ## 工作流程
 
@@ -97,16 +94,8 @@ Claude Code 通过插件市场或直接从 git 仓库安装。
     │  → test-reviewer 审查 → 用户确认
     ▼
 [Phase 3] test-case-generation
-    │  生成功能用例 → test-reviewer 审查 → 用户确认
-    ▼
-[Phase 4] automation-analysis
-    │  分析自动化可行性 → 用户确认
-    ▼
-[Phase 5] automation-scripting
-    │  生成 Playwright 脚本 → test-reviewer 审查
-    ▼
-[Phase 6] test-reporting
-       生成最终测试报告
+       生成功能用例 → test-reviewer 审查 → 用户确认
+       → 终点产物：功能测试用例
 ```
 
 ## 文件结构
@@ -124,17 +113,11 @@ Supertester 在项目目录下创建 `.supertester/` 目录：
 │   ├── module-dependencies.md
 │   ├── implicit-requirements.md
 │   └── cross-module-scenarios.md
-├── test-cases/              # Phase 3-4 输出
-│   ├── functional-cases.md
-│   ├── automation-analysis.md
+├── test-cases/              # Phase 3 输出
+│   ├── functional-cases.yaml
 │   └── deduplication-report.md
-├── scripts/                 # Phase 5 输出
-│   ├── *.spec.ts
-│   └── manual-cases.md
-├── reviews/                 # 审查记录
-│   └── review-*.md
-└── reports/                # Phase 6 输出
-    └── *.md
+└── reviews/                 # 审查记录
+    └── review-*.md
 ```
 
 ## 获取帮助

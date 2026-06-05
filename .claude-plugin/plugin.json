@@ -1,6 +1,6 @@
 {
   "name": "supertester",
-  "description": "AI-driven software testing workflow plugin: from requirements to Playwright E2E scripts",
+  "description": "AI-driven software testing workflow plugin: from requirements to functional test cases",
   "version": "0.8.0",
   "author": {
     "name": "supertester"
@@ -10,11 +10,9 @@
   "license": "MIT",
   "keywords": [
     "testing",
-    "playwright",
-    "e2e",
+    "test-case-generation",
     "test-generation",
     "requirements-analysis",
-    "test-automation",
     "quality-assurance"
   ]
 }

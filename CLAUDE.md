@@ -2,14 +2,14 @@
 
 ## 插件概述
 
-Supertester 是面向 Claude Code 的 Superpowers 风格纯 Markdown 技能插件，覆盖完整测试生命周期：
-需求解析 -> 需求关联分析 -> 功能测试用例生成 -> 自动化可行性分析 -> Playwright 脚本生成 -> 测试报告。
+Supertester（需求到用例版）是面向 Claude Code 的 Superpowers 风格纯 Markdown 技能插件，覆盖从需求到测试用例的流程：
+需求解析 -> 需求关联分析 -> 功能测试用例生成。本版本不涉及自动化可行性分析、Playwright 脚本生成与测试报告。
 
 ## 核心原则
 
 1. **需求优先** — 不理解需求，不准生成任何测试
 2. **文件即记忆** — 所有重要信息写入 `.supertester/` 目录下的文件，不依赖上下文窗口
-3. **两阶段测试生成** — 先生成人工可读用例，确认后再生成自动化脚本
+3. **用例即终点** — 流程产出经审查并用户确认的功能测试用例，不生成自动化脚本与测试报告
 4. **独立审查** — test-reviewer agent 独立审查，不自证清白
 5. **人工介入门禁** — 关键节点必须用户确认后才能继续
 
@@ -21,9 +21,6 @@ Supertester 是面向 Claude Code 的 Superpowers 风格纯 Markdown 技能插�
 | requirement-analysis | 需求解析与澄清 | "分析 requirements/xxx.md" |
 | requirement-association | 需求关联分析 | "分析模块依赖" |
 | test-case-generation | 功能测试用例生成 | "生成测试用例" |
-| automation-analysis | 自动化可行性分析 | "分析哪些可以自动化" |
-| automation-scripting | Playwright 脚本生成 | "生成 Playwright 脚本" |
-| test-reporting | 测试报告生成 | "生成测试报告" |
 
 ## 文件持久化
 
@@ -38,7 +35,7 @@ Supertester 是面向 Claude Code 的 Superpowers 风格纯 Markdown 技能插�
 
 - **Iron Law**: 每个 Skill 的绝对禁令
 - **Hard Gate**: 阻塞进入下一阶段的硬门禁
-- **Max Phase**: 在 test_plan.md 中设定工作流终止阶段。达到后自动终止，不进入后续 Phase。留空或不填 = 执行全部 6 个 Phase
+- **Max Phase**: 在 test_plan.md 中设定工作流终止阶段。达到后自动终止，不进入后续 Phase。留空或不填 = 执行全部 3 个 Phase（终点为功能测试用例生成）
 - **Red Flags**: Agent 自我说服的防御表
 - **2-Action Rule**: 每 2 个操作后必须更新文件
 - **3-Strike Protocol**: 3 次失败后升级到用户
@@ -88,4 +85,4 @@ Reply with the option number only.
 
 ## Agent
 
-- `test-reviewer` — 独立审查 agent，在 Phase 2/3/5 审查产出物质量
+- `test-reviewer` — 独立审查 agent，在 Phase 2/3 审查产出物质量
