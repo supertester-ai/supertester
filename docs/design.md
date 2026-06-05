@@ -8,10 +8,10 @@
 
 - **Superpowers** — Skill 行为塑造模式（Iron Law / Hard Gate / Red Flags / 验证循环）
 - **planning-with-files** — 3 文件持久化 + Hooks 注意力操控 + 会话恢复
-- **测试领域知识** — 需求解析、用例生成、自动化脚本、测试分析
+- **测试领域知识** — 需求解析、需求关联分析、功能测试用例生成
 
-**核心功能：** AI 驱动的软件测试助手，覆盖完整测试生命周期：需求解析、需求关联分析、功能测试用例生成、自动化脚本生成和测试报告。
-**目标用户：** 使用 Playwright 进行 Web E2E 测试的 JavaScript/TypeScript 开发者。
+**核心功能：** AI 驱动的软件测试助手，覆盖从需求到功能测试用例的设计阶段：需求解析、需求关联分析、功能测试用例生成。
+**目标用户：** 需要从需求文档稳定产出结构化功能测试用例的测试与研发团队。
 
 ***
 
@@ -29,29 +29,21 @@
 
 借鉴 planning-with-files 的核心哲学：所有重要信息必须写入磁盘文件。每个阶段的输入和输出都落盘为本地 Markdown 文件，保持全程可追溯。Agent 不依赖上下文记忆，而是依赖持久化文件作为工作记忆。
 
-### 原则三：两阶段测试生成
+### 原则三：功能用例是经审查确认的终点产物
 
 ```
 ┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────────────┐
-│  功能测试用例    │ ──▶ │      确认环节         │ ──▶ │     自动化脚本           │
-│  (人工可读)      │     │    (用户确认)         │     │  (自动化 + 人工标记)     │
+│  功能测试用例    │ ──▶ │   test-reviewer 审查  │ ──▶ │   用户确认（终点产物）   │
+│  (人工可读)      │     │    (独立质量门禁)     │     │  functional-cases.yaml  │
 └─────────────────┘     └──────────────────────┘     └─────────────────────────┘
 ```
 
-**阶段一：功能测试用例（人工用例）**
+**功能测试用例是整个工作流的终点交付物：**
 
-- 从需求生成人工可读的测试用例
-- 不涉及自动化，仅包含测试步骤和预期结果
-- 重点关注完整性：测试什么，而非如何自动化
-
-**阶段二：自动化脚本**
-
-- 仅在功能测试用例确认后开始
-- 生成 Playwright E2E 测试代码
-- **为每个测试用例标记：**
-  - `automatable` - 可完全自动化
-  - `partial` - 部分可自动化，需人工介入
-  - `manual` - 需人工执行
+- 从需求生成人工可读的测试用例，包含前置条件、测试步骤和预期结果
+- 重点关注完整性：测试什么，以及测到多细（保真度策略）
+- 用例必须先经过 test-reviewer 独立审查，再提交给用户确认
+- 机器可读的终点产物为 `functional-cases.yaml`，不再向下游生成任何脚本或报告
 
 ### 原则四：独立审查，不自证清白
 
@@ -66,10 +58,7 @@
                                   │
          ┌────────────────────────┘
          ▼
-关联分析 ──▶ 用户确认 ──▶ 功能用例 ──▶ 审查 ──▶ 用户确认
-                                                    │
-                                                    ▼
-                                  自动化脚本 ──▶ 带标记的输出
+关联分析 ──▶ 用户确认 ──▶ 功能用例 ──▶ 审查 ──▶ 用户确认（终点产物）
 ```
 
 ***
@@ -93,7 +82,7 @@ supertester/
 │   ├── stop                           # 验证所有阶段完成度
 │   └── run-hook.cmd                   # Windows 兼容脚本
 │
-├── skills/                            # 7 个 Skill（核心测试工作流）
+├── skills/                            # 4 个 Skill（核心测试工作流）
 │   ├── using-supertester/
 │   │   └── SKILL.md                   # 入口 skill：触发规则 + 3 文件模式 + skill 索引
 │   ├── requirement-analysis/
@@ -101,23 +90,15 @@ supertester/
 │   │   └── clarification-patterns.md  # 模糊需求识别模式参考
 │   ├── requirement-association/
 │   │   └── SKILL.md                   # 模块依赖 + 隐含需求 + 跨模块场景
-│   ├── test-case-generation/
-│   │   ├── SKILL.md                   # 智能编排 + 8 子生成器 + 去重
-│   │   └── generator-reference.md     # 子生成器详细参考
-│   ├── automation-analysis/
-│   │   └── SKILL.md                   # 自动化可行性分析 + 标记
-│   ├── automation-scripting/
-│   │   ├── SKILL.md                   # Playwright 代码生成
-│   │   └── playwright-patterns.md     # Playwright 最佳实践参考
-│   └── test-reporting/
-│       ├── SKILL.md                   # 报告生成
-│       └── report-template.md         # 报告模板
+│   └── test-case-generation/
+│       ├── SKILL.md                   # 智能编排 + 8 子生成器 + 去重
+│       └── generator-reference.md     # 子生成器详细参考
 │
 ├── agents/                            # 独立审查 Agent
-│   └── test-reviewer.md              # 测试用例/脚本审查 agent
+│   └── test-reviewer.md              # 功能测试用例审查 agent
 │
 ├── templates/                         # 3 文件持久化模板
-│   ├── test_plan.md                   # 测试计划模板（含 6 阶段）
+│   ├── test_plan.md                   # 测试计划模板（含 3 阶段）
 │   ├── findings.md                    # 发现记录模板
 │   └── progress.md                    # 进度日志模板
 │
@@ -140,7 +121,6 @@ supertester/
 | 持久化模式 | planning-with-files 3 文件模式       | 经过 96.7% pass rate 验证、会话恢复可靠、防目标漂移              |
 | 行为控制  | Iron Law + Hard Gate + Red Flags | Superpowers 验证过的 prompt 级行为塑造，无需代码              |
 | 质量保证  | 独立 test-reviewer agent           | 生成与审查分离，避免"自证清白"                                |
-| 自动化框架 | Playwright                       | 目标用户为 Web E2E 测试的 JS/TS 开发者                     |
 
 ***
 
@@ -168,7 +148,7 @@ supertester/
 
 - 目标：一句话描述最终状态
 - 当前阶段：哪个阶段正在进行
-- 6 个阶段的状态：`pending` → `in_progress` → `complete`
+- 3 个阶段的状态：`pending` → `in_progress` → `complete`
 - 关键决策：每个技术/设计选择及其理由
 - 错误记录：每个错误及其尝试次数和解决方案
 
@@ -236,20 +216,12 @@ supertester/
 │   │   ├── implicit-requirements.md        # 隐含需求列表
 │   │   └── cross-module-scenarios.md       # 跨模块场景
 │   │
-│   ├── test-cases/                         # Phase 3-4 输出
-│   │   ├── functional-cases.md             # 功能测试用例（人工可读）
-│   │   ├── automation-analysis.md          # 自动化可行性标记
+│   ├── test-cases/                         # Phase 3 输出（终点产物）
+│   │   ├── functional-cases.yaml           # 功能测试用例（机器可读，终点产物）
 │   │   └── deduplication-report.md         # 去重报告
 │   │
-│   ├── scripts/                            # Phase 5 输出
-│   │   ├── *.spec.ts                       # Playwright 自动化脚本
-│   │   └── manual-cases.md                 # 仅人工执行的用例
-│   │
-│   ├── reviews/                            # test-reviewer 审查记录
-│   │   └── review-<phase>-<timestamp>.md   # 每次审查的详细记录
-│   │
-│   └── reports/                            # Phase 6 输出
-│       └── YYYY-MM-DD-<module>.md          # 最终测试报告
+│   └── reviews/                            # test-reviewer 审查记录
+│       └── review-<phase>-<timestamp>.md   # 每次审查的详细记录
 ```
 
 ### 阶段间可追溯链
@@ -274,20 +246,11 @@ cross-module-scenarios.md (场景ID: CMS-001...)
     │  记录到: findings.md 关联发现
     │  审查: test-reviewer → reviews/review-association-*.md
     ▼
-functional-cases.md (用例ID: TC-001, 溯源: F-001 行45-48)
-    │  来源: F-xxx + CMS-xxx + IR-xxx
-    │  记录到: test_plan.md Phase 3 decisions
-    │  审查: test-reviewer → reviews/review-testcases-*.md
-    ▼
-automation-analysis.md (TC-001 → automatable)
-    │  来源: TC-xxx 的可行性分析
-    │  记录到: progress.md 分析日志
-    ▼
-*.spec.ts (代码注释: // TC-001 | F-001)
-    │  来源: TC-xxx + 自动化标记
-    │  审查: test-reviewer → reviews/review-scripts-*.md
-    ▼
-report.md (完整追溯链: 需求 → 用例 → 脚本)
+functional-cases.yaml (用例ID: TC-001, 溯源: F-001 行45-48)
+       来源: F-xxx + CMS-xxx + IR-xxx
+       记录到: test_plan.md Phase 3 decisions
+       审查: test-reviewer → reviews/review-testcases-*.md
+       → 终点产物（完整追溯链: 需求 → 关联 → 用例）
 ```
 
 ***
@@ -388,10 +351,7 @@ fi
 | 0 | using-supertester       | —              | 用户触发                                         | 初始化 .supertester/ 3 文件                                                      | —             |
 | 1 | requirement-analysis    | 不理解需求不准测试      | 需求文档                                         | parsed-requirements.md, clarifications.json                                 | —             |
 | 2 | requirement-association | 不分析关联不准生成用例    | parsed-requirements.md                       | module-dependencies.md, implicit-requirements.md, cross-module-scenarios.md | test-reviewer |
-| 3 | test-case-generation    | 按特征选生成器，不盲目全调用 | 上述所有需求文件                                     | functional-cases.md, deduplication-report.md                                | test-reviewer |
-| 4 | automation-analysis     | 未确认用例不准分析      | functional-cases.md（已确认）                     | automation-analysis.md                                                      | —             |
-| 5 | automation-scripting    | 只为确认用例生成脚本     | functional-cases.md + automation-analysis.md | \*.spec.ts, manual-cases.md                                                 | test-reviewer |
-| 6 | test-reporting          | —              | 全部阶段输出                                       | reports/YYYY-MM-DD-\*.md                                                    | —             |
+| 3 | test-case-generation    | 按特征选生成器，不盲目全调用 | 上述所有需求文件                                     | functional-cases.yaml, deduplication-report.md                              | test-reviewer |
 
 ### Skill 0：using-supertester（入口）
 
@@ -413,9 +373,6 @@ fi
 | 继续澄清     | requirement-analysis（恢复） | "继续澄清"、"恢复 CL-002"            |
 | 分析模块关联   | requirement-association  | "分析模块依赖"                      |
 | 生成功能用例   | test-case-generation     | "生成登录模块的测试用例"                 |
-| 分析自动化可行性 | automation-analysis      | "分析哪些可以自动化"                   |
-| 生成自动化脚本  | automation-scripting     | "生成 Playwright 脚本"            |
-| 生成报告     | test-reporting           | "生成测试报告"                      |
 | 查询/问答    | 直接回答                     | "checkout 模块需要哪些测试？"          |
 
 ### Skill 1：requirement-analysis（需求解析与澄清）
@@ -662,8 +619,8 @@ parsed-requirements.md
 
 ```
 <HARD-GATE>
-在用户确认功能用例之前，不准进入 automation-analysis 阶段。
 用例未经 test-reviewer 审查之前，不准提交给用户确认。
+功能用例经用户确认后即为工作流终点产物，不再向下游生成脚本或报告。
 </HARD-GATE>
 ```
 
@@ -741,7 +698,7 @@ parsed-requirements.md
 - 异常场景覆盖正常场景 → 保留异常场景
 ```
 
-**用例输出格式（functional-cases.md）：**
+**用例输出格式（人工可读视图，机器可读产物为 functional-cases.yaml）：**
 
 ```markdown
 # 功能测试用例
@@ -787,159 +744,6 @@ parsed-requirements.md
 | "去重不重要"        | 重复用例降低用户信任度                      |
 | "跳过审查直接给用户"    | 违反 Hard Gate，test-reviewer 必须先审查 |
 
-### Skill 4：automation-analysis（自动化可行性分析）
-
-**Iron Law：**
-
-> **未经用户确认的用例不准分析自动化可行性。**
-
-**前置条件：** Phase 3 (test-case-generation) 状态为 complete，且用户已确认用例
-
-**自动化等级判断标准：**
-
-| 等级            | 标准                   | 示例               |
-| ------------- | -------------------- | ---------------- |
-| `automatable` | 所有步骤可自动化，无需视觉/人工验证   | API 调用、表单提交、页面跳转 |
-| `partial`     | 核心步骤可自动化，但需人工设置或最终验证 | 需要视觉验证的 UI 元素    |
-| `manual`      | 需人工观察、物理设备或复杂设置      | 邮件内容验证、物理设备交互    |
-
-**输出格式（automation-analysis.md）：**
-
-```markdown
-# 自动化可行性分析
-
-## 统计
-- 总用例: 28
-- automatable: 18 (64%)
-- partial: 7 (25%)
-- manual: 3 (11%)
-
-## 详细分析
-
-| 用例ID | 名称 | 等级 | 理由 | 可自动化部分 | 需人工部分 |
-|--------|------|------|------|-------------|-----------|
-| TC-001 | 有效邮箱登录 | automatable | 全部步骤可通过 Playwright 模拟 | 步骤 1-4 | — |
-| TC-015 | 视觉元素验证 | partial | 页面跳转可自动化，视觉验证需人工 | 步骤 1-3 | 步骤 4: 视觉验证 |
-| TC-020 | 邮件通知验证 | manual | 需要实际收到邮件并验证内容 | — | 全部 |
-```
-
-### Skill 5：automation-scripting（自动化脚本生成）
-
-**Iron Law：**
-
-> **只为已确认且标记为 automatable/partial 的用例生成脚本。**
-
-**Hard Gate：**
-
-```
-<HARD-GATE>
-manual 用例不生成代码，只生成文档化的执行步骤到 manual-cases.md。
-生成的脚本必须经过 test-reviewer 审查后才能输出给用户。
-</HARD-GATE>
-```
-
-**前置条件：** Phase 4 (automation-analysis) 状态为 complete
-
-**生成规则：**
-
-1. `automatable` 用例 → 完整 Playwright 测试代码
-2. `partial` 用例 → 自动化部分代码 + `// HUMAN VERIFICATION NEEDED` 注释
-3. `manual` 用例 → manual-cases.md 中的详细执行步骤
-
-**代码规范：**
-
-- 每个测试文件对应一个模块
-- 使用 Page Object 模式
-- 每个 test 注释标记溯源：`// TC-001 | F-001 | auth-prd.md:45-48`
-- Arrange-Act-Assert 结构
-- 合理使用 data-testid 选择器
-
-**Playwright 脚本示例：**
-
-```typescript
-// auth.e2e.spec.ts
-// 模块: 用户认证
-// 生成时间: 2026-04-07
-// 来源: functional-cases.md
-
-import { test, expect } from '@playwright/test';
-
-// TC-001 | F-001 | auth-prd.md:45-48
-test('should login with valid email', async ({ page }) => {
-  // Arrange
-  await page.goto('/login');
-
-  // Act
-  await page.fill('[data-testid="email-input"]', 'test@example.com');
-  await page.fill('[data-testid="password-input"]', 'CorrectPassword123');
-  await page.click('[data-testid="login-btn"]');
-
-  // Assert
-  await expect(page).toHaveURL('/dashboard');
-  await expect(page.locator('[data-testid="welcome-msg"]')).toContainText('欢迎回来');
-});
-
-// TC-015 | F-001 | auth-prd.md:52
-test('should display welcome elements after login', async ({ page }) => {
-  // Automated part
-  await page.goto('/login');
-  await page.fill('[data-testid="email-input"]', 'test@example.com');
-  await page.fill('[data-testid="password-input"]', 'password123');
-  await page.click('[data-testid="login-btn"]');
-  await expect(page).toHaveURL('/dashboard');
-
-  // HUMAN VERIFICATION NEEDED:
-  // - Verify "Welcome back, User!" message styling is correct
-  // - Check dashboard layout renders without visual glitches
-  // - Confirm notification bell icon appears in correct position
-});
-```
-
-### Skill 6：test-reporting（测试报告生成）
-
-**前置条件：** Phase 5 (automation-scripting) 状态为 complete
-
-**报告内容结构：**
-
-```markdown
-# 测试报告: [模块名]
-
-## 执行摘要
-- 生成日期: YYYY-MM-DD
-- 需求文档: requirements/xxx.md
-- 总用例数: N
-- 自动化率: X%
-
-## 需求覆盖
-| 需求ID | 名称 | 关联用例数 | 覆盖状态 |
-|--------|------|-----------|---------|
-| F-001 | 邮箱登录 | 5 | 完整覆盖 |
-
-## 功能测试用例摘要
-[按模块分组的用例列表]
-
-## 自动化分析
-| 等级 | 数量 | 占比 |
-|------|------|------|
-| automatable | N | X% |
-| partial | N | X% |
-| manual | N | X% |
-
-## 跨模块场景
-[跨模块测试场景列表]
-
-## 自动化脚本
-[脚本文件列表及对应用例映射]
-
-## 人工测试用例
-[仅人工执行的用例列表]
-
-## 追溯矩阵
-[需求 → 用例 → 脚本 的完整映射]
-```
-
-**输出位置：** `.supertester/reports/YYYY-MM-DD-<module>.md`
-
 ***
 
 ## test-reviewer Agent
@@ -955,8 +759,7 @@ test-reviewer 是一个独立的审查 agent，不依赖任何生成 skill，从
 | 阶段      | 审查对象   | 审查文件                                                | 审查记录                             |
 | ------- | ------ | --------------------------------------------------- | -------------------------------- |
 | Phase 2 | 需求关联分析 | cross-module-scenarios.md, implicit-requirements.md | reviews/review-association-\*.md |
-| Phase 3 | 功能测试用例 | functional-cases.md                                 | reviews/review-testcases-\*.md   |
-| Phase 5 | 自动化脚本  | \*.spec.ts                                          | reviews/review-scripts-\*.md     |
+| Phase 3 | 功能测试用例 | functional-cases.yaml                               | reviews/review-testcases-\*.md   |
 
 ### 审查协议
 
@@ -982,14 +785,6 @@ test-reviewer 是一个独立的审查 agent，不依赖任何生成 skill，从
 - 需求溯源是否准确?
 - 子生成器选择是否合理?
 - 去重是否彻底?
-
-### 3. 脚本质量审查（Phase 5）
-- 代码是否可运行（无语法错误）?
-- 是否遵循 Playwright 最佳实践?
-- 选择器策略是否稳定 (data-testid > CSS)?
-- Arrange-Act-Assert 结构是否清晰?
-- 溯源注释是否完整（TC-xxx | F-xxx）?
-- partial 用例的 HUMAN VERIFICATION 标记是否准确?
 
 ## 输出格式
 
@@ -1085,26 +880,23 @@ if action_failed:
 
 ## 用户交互模式
 
-### 模式一：完整流程（需求到报告）
+### 模式一：完整流程（需求到功能用例）
 
 ```
-用户: 分析 requirements/auth-prd.md 并生成测试
+用户: 分析 requirements/auth-prd.md 并生成测试用例
   → [Skill 0] 初始化 .supertester/
   → [Skill 1] 解析需求 → 澄清模糊项 → parsed-requirements.md
   → [Skill 2] 关联分析 → test-reviewer 审查 → 用户确认
-  → [Skill 3] 生成用例 → test-reviewer 审查 → 用户确认
-  → [Skill 4] 自动化分析 → automation-analysis.md → 用户确认
-  → [Skill 5] 生成脚本 → test-reviewer 审查 → *.spec.ts
-  → [Skill 6] 生成报告 → reports/2026-04-07-auth.md
+  → [Skill 3] 生成用例 → test-reviewer 审查 → 用户确认 → functional-cases.yaml（终点产物）
 ```
 
 ### 模式二：从中间阶段开始
 
 ```
-用户: 为已有的功能用例生成自动化脚本
-  → [Skill 0] 检测 .supertester/test-cases/functional-cases.md 存在
-  → [Skill 4] 自动化分析
-  → [Skill 5] 生成脚本
+用户: 已有需求解析结果，继续做需求关联分析并生成用例
+  → [Skill 0] 检测 .supertester/requirements/parsed-requirements.md 存在
+  → [Skill 2] 关联分析 → test-reviewer 审查 → 用户确认
+  → [Skill 3] 生成用例 → test-reviewer 审查 → 用户确认
 ```
 
 ### 模式三：恢复中断的会话
@@ -1171,36 +963,7 @@ if action_failed:
 | FR-4.5 | 对生成的测试用例去重               | 必须  |
 | FR-4.6 | 每个用例包含需求溯源（文件+行号）        | 必须  |
 | FR-4.7 | 经过 test-reviewer 审查      | 必须  |
-| FR-4.8 | 持久化到 functional-cases.md | 必须  |
-
-### FR-5: 自动化可行性分析
-
-| ID     | 需求                             | 优先级 |
-| ------ | ------------------------------ | --- |
-| FR-5.1 | 分析每个测试用例的自动化潜力                 | 必须  |
-| FR-5.2 | 分类为 automatable/partial/manual | 必须  |
-| FR-5.3 | 解释分类原因                         | 必须  |
-| FR-5.4 | 持久化到 automation-analysis.md    | 必须  |
-
-### FR-6: 自动化脚本生成
-
-| ID     | 需求                            | 优先级 |
-| ------ | ----------------------------- | --- |
-| FR-6.1 | 生成 Playwright 代码（Web E2E）     | 必须  |
-| FR-6.2 | 遵循项目约定的模式和规范                  | 必须  |
-| FR-6.3 | 应用 Page Object 模式             | 必须  |
-| FR-6.4 | 在代码注释中标记溯源（TC-xxx \| F-xxx）   | 必须  |
-| FR-6.5 | 分离 manual 用例到 manual-cases.md | 必须  |
-| FR-6.6 | 经过 test-reviewer 审查           | 必须  |
-
-### FR-7: 报告生成
-
-| ID     | 需求               | 优先级 |
-| ------ | ---------------- | --- |
-| FR-7.1 | 生成 Markdown 报告文件 | 必须  |
-| FR-7.2 | 包含完整追溯矩阵         | 必须  |
-| FR-7.3 | 包含所有阶段的统计摘要      | 必须  |
-| FR-7.4 | 持久化到 reports/ 目录 | 必须  |
+| FR-4.8 | 持久化到 functional-cases.yaml | 必须  |
 
 ### FR-8: 文件持久化与会话恢复
 
@@ -1216,7 +979,7 @@ if action_failed:
 
 | ID     | 需求                                 | 优先级 |
 | ------ | ---------------------------------- | --- |
-| FR-9.1 | test-reviewer 独立审查 Phase 2/3/5 的产出 | 必须  |
+| FR-9.1 | test-reviewer 独立审查 Phase 2/3 的产出 | 必须  |
 | FR-9.2 | 审查结果分类为 CRITICAL/HIGH/MEDIUM/LOW   | 必须  |
 | FR-9.3 | CRITICAL/HIGH 必须修复后重新审查            | 必须  |
 | FR-9.4 | 审查记录持久化到 reviews/ 目录               | 必须  |
@@ -1241,7 +1004,7 @@ if action_failed:
 
 ## Phase 1 范围外
 
-- 测试执行编排 — 不执行测试，只生成用例和脚本
+- 测试执行编排 — 不执行测试，只生成功能测试用例
 - CI/CD 集成 — 不做 CI/CD 集成
 - 快照测试 — 不生成快照测试
 - Mock 文件生成 — 不自动生成 mock 文件

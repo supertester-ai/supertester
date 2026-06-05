@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "supertester",
-      "description": "AI-driven software testing workflow plugin: from requirements to Playwright E2E scripts",
+      "description": "AI-driven software testing workflow plugin: from requirements to functional test cases",
       "version": "0.8.0",
       "source": "./"
     }

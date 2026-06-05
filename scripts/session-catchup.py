@@ -112,9 +112,8 @@ def main():
         ("requirements/module-dependencies.md", "Module dependencies"),
         ("requirements/implicit-requirements.md", "Implicit requirements"),
         ("requirements/cross-module-scenarios.md", "Cross-module scenarios"),
-        ("test-cases/functional-cases.md", "Functional test cases"),
+        ("test-cases/functional-cases.yaml", "Functional test cases"),
         ("test-cases/deduplication-report.md", "Deduplication report"),
-        ("test-cases/automation-analysis.md", "Automation analysis"),
     ]
 
     for file_path, description in output_files:
@@ -122,13 +121,6 @@ def main():
         exists = os.path.isfile(full_path)
         marker = "[x]" if exists else "[ ]"
         print(f"  {marker} {description} ({file_path})")
-
-    # Check scripts
-    script_files = list(Path(os.path.join(supertester_dir, "scripts")).glob("*.spec.ts"))
-    if script_files:
-        print(f"\nGenerated Scripts: {len(script_files)}")
-        for sf in script_files:
-            print(f"  - {sf.name}")
 
     # Check reviews
     review_files = list(Path(os.path.join(supertester_dir, "reviews")).glob("review-*.md"))

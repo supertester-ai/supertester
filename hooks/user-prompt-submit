@@ -29,9 +29,6 @@ if [ -f ".supertester/test_plan.md" ]; then
         1) iron_law="Iron Law: Do not generate any tests without understanding the requirements." ;;
         2) iron_law="Iron Law: Do not generate test cases without analyzing module associations." ;;
         3) iron_law="Iron Law: Select generators by requirement characteristics; do not blindly invoke all." ;;
-        4) iron_law="Iron Law: Do not analyze automation feasibility for unconfirmed test cases." ;;
-        5) iron_law="Iron Law: Only generate scripts for confirmed cases marked as automatable/partial." ;;
-        6) iron_law="" ;;
         *) iron_law="" ;;
     esac
 

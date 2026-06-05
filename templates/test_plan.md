@@ -12,9 +12,9 @@
 Phase 1
 
 ## Max Phase
-<!-- 工作流终止阶段。设定后，达到该阶段即自动终止，不进入后续 Phase。
-     例: Phase 3 表示完成测试用例生成后停止，不进入自动化分析和脚本生成。
-     留空或不填表示执行全部 6 个 Phase。 -->
+<!-- 工作流终止阶段。本插件覆盖从需求到测试用例的 3 个 Phase，
+     终点为 Phase 3（功能测试用例生成），不涉及自动化分析、脚本生成与测试报告。
+     留空或不填表示执行全部 3 个 Phase。 -->
 Phase 3
 
 ## Phases
@@ -51,31 +51,6 @@ Phase 3
 - [ ] test-reviewer 审查（含矩阵聚合合理性 + verbatim 完整性）
 - [ ] 用户确认
 - **Completion Gate:** 行为覆盖与证据覆盖均可追踪，关键测试资产未丢失，无零散派生 single 群
-- **Status:** pending
-
-### Phase 4: 自动化可行性分析
-- [ ] 分析每个测试用例的自动化潜力（matrix 用例逐 children 叶子 step 评估）
-- [ ] 标记为 automatable / partial / manual
-- [ ] 说明哪些测试资产不适合完全自动化，需保留人工验证
-- [ ] 生成 automation-analysis.yaml + automation-analysis.md
-- **Completion Gate:** 自动化边界明确（含叶子 step 级），未强行脚本化所有测试资产
-- **Status:** pending
-
-### Phase 5: 自动化脚本生成
-- [ ] 为 automatable 用例生成完整 Playwright 代码
-- [ ] 为 partial 用例生成部分代码 + HUMAN VERIFICATION 标记
-- [ ] 为 manual 用例生成 manual-cases.md
-- [ ] test-reviewer 审查
-- **Completion Gate:** 自动化结果与人工保留项边界清晰
-- **Status:** pending
-
-### Phase 6: 测试报告
-- [ ] 生成需求覆盖矩阵
-- [ ] 生成覆盖维度总结（行为 / 规则 / 状态 / 集成 / 证据链）
-- [ ] 生成自动化统计
-- [ ] 生成 gap 分析与保留项说明
-- [ ] 生成完整追溯链报告
-- **Completion Gate:** 能清楚说明已覆盖、保留、遗漏与建议补强项
 - **Status:** pending
 
 ## Critical Test Assets

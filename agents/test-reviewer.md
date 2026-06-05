@@ -1,7 +1,7 @@
 ---
 name: test-reviewer
 description: |
-  Independent test quality reviewer agent. Use this agent to review outputs from Phase 2 (requirement association), Phase 3 (test case generation), and Phase 5 (automation scripting). This agent performs quality checks that the generating skill cannot do for itself - generation and review must be separate roles.
+  Independent test quality reviewer agent. Use this agent to review outputs from Phase 2 (requirement association) and Phase 3 (test case generation). This agent performs quality checks that the generating skill cannot do for itself - generation and review must be separate roles.
 model: inherit
 ---
 
@@ -119,19 +119,6 @@ This is the new P0 review layer. You must actively search for these gaps.
 #### G. PRD-External Business Asset Gaps
 
 - If `parsed-requirements.md` records ops toggles, legacy behavior, removed flows, or compatibility rules, are these reflected in coverage?
-
-### 4. Script Quality Review (Phase 5)
-
-- **Syntax:** is the TypeScript valid?
-- **Playwright Best Practices:**
-  - uses `data-testid` selectors where possible
-  - uses auto-wait patterns rather than fixed sleeps
-  - uses proper assertions
-- **Selector Stability:** are selectors resilient?
-- **Arrange-Act-Assert:** is structure clear?
-- **Traceability Comments:** does each test include `// TC-xxx | F-xxx`?
-- **Partial Marking:** are `HUMAN VERIFICATION NEEDED` comments accurate?
-- **Page Object Pattern:** is it used consistently when expected?
 
 ## Severity Rules
 

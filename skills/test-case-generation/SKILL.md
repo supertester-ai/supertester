@@ -26,7 +26,7 @@ description: Use when generating functional test cases from confirmed requiremen
 > 优先级反映"该测试失败时的业务影响 × 触发概率"。**P0 = 阻塞级**（核心主流程、安全、资金、数据完整性、关键契约——失败即影响发布）；**P1 = 重要级**（关键校验、常用异常路径、集成失败处理、主语言文案、关键状态转换——失败即明显缺陷）；**P2 = 次要级**（罕见边界、长尾组合、纯视觉细节、低流量平台/语言、加固型用例——失败可延后修复）。每个功能至少有 1 条含 `level: P0` 叶子 step 的用例覆盖其核心成功路径；任何缺失 `level` 或将全部叶子 step 标为同一等级的产出，视为优先级分级缺失，列为 HIGH 级问题。
 
 <HARD-GATE>
-在用户确认功能用例之前，不准进入 automation-analysis 阶段。
+功能测试用例是本流程的终点产物，必须经用户确认后才算交付完成。
 用例未经 test-reviewer 审查之前，不准提交给用户确认。
 </HARD-GATE>
 
@@ -134,7 +134,7 @@ description: Use when generating functional test cases from confirmed requiremen
 对每个功能 (F-xxx)：
 1. **识别访问上下文清单（强制）**: 从需求中识别该功能涉及的所有独立访问上下文（如：公开页面 vs 认证后页面、不同认证状态视角、不同终端或平台）。同一组件若在多个上下文中出现且行为或展示存在差异，每个上下文必须作为独立测试表面分别生成用例，不能只覆盖其中一个上下文而将其他标记为\"类似\"或\"后续补充\"。输出格式：列出每个上下文的名称、入口条件及该上下文下的独特行为/展示差异点
 2. 分析其证据特征：需要通过哪些观测面验证？是否存在关键测试资产？对每个观测面，确定具体的验证方式（如 ui_text_assertion、url_assertion、screenshot_comparison 等），不同验证方式意味着不同的用例预期写法
-3. **视觉资产清单（强制提取）**: 识别品牌/结构性视觉区域——如果功能包含承载品牌标识或全局页面结构的区域（页头、页脚、导航栏、品牌 Logo 区），标记为需要独立视觉验收，不得与功能性用例合并覆盖；普通交互控件不在此列。在此基础上，扫描每个功能，枚举所有需要视觉验收的非交互元素，输出结构化清单。涵盖但不限于以下类别：(a) 品牌标识元素——产品 Logo、Favicon、品牌配色区域、版权声明等；(b) 静态展示媒体——Banner 图、宣传图片、图标集、占位图等；(c) 页面结构骨架——页头、页脚、导航栏、侧边栏的布局与响应式断点表现；(d) 样式一致性区域——字体层级、间距规范、配色主题在不同状态下的一致性。对清单中每个条目记录：条目名称、所属功能/页面区域、验证方式（`manual_visual_check` 或 `screenshot_comparison`）、自动化可行性（manual 或 partial）。此清单在 Step 2 中作为视觉验收的逐项核对基准——清单中每个条目必须在至少一条独立用例中体现，不得与功能性行为用例合并覆盖，不得因无法自动化断言而跳过。如果某功能不包含任何视觉资产，在清单中显式标注"无视觉资产"以证明已检查而非遗漏
+3. **视觉资产清单（强制提取）**: 识别品牌/结构性视觉区域——如果功能包含承载品牌标识或全局页面结构的区域（页头、页脚、导航栏、品牌 Logo 区），标记为需要独立视觉验收，不得与功能性用例合并覆盖；普通交互控件不在此列。在此基础上，扫描每个功能，枚举所有需要视觉验收的非交互元素，输出结构化清单。涵盖但不限于以下类别：(a) 品牌标识元素——产品 Logo、Favicon、品牌配色区域、版权声明等；(b) 静态展示媒体——Banner 图、宣传图片、图标集、占位图等；(c) 页面结构骨架——页头、页脚、导航栏、侧边栏的布局与响应式断点表现；(d) 样式一致性区域——字体层级、间距规范、配色主题在不同状态下的一致性。对清单中每个条目记录：条目名称、所属功能/页面区域、验证方式（`manual_visual_check` 或 `screenshot_comparison`）。此清单在 Step 2 中作为视觉验收的逐项核对基准——清单中每个条目必须在至少一条独立用例中体现，不得与功能性行为用例合并覆盖，不得因无法自动化断言而跳过。如果某功能不包含任何视觉资产，在清单中显式标注"无视觉资产"以证明已检查而非遗漏
    - 需要逐项校验的内容
    - 需要保留完整枚举/矩阵的规则
    - 必须验证的状态/数据副作用
@@ -162,7 +162,6 @@ description: Use when generating functional test cases from confirmed requiremen
 - `feature`: 功能 ID (F-xxx)，可附 `sub_refs: [E-xxx, I-xxx]`。**这是承载代号的纯溯源字段**——内容字段里被删掉的代号在这里登记。可写成 `名称(F-xxx)` 形态，既保留人类可读名又保留代号索引
 - `verification_method`: 验证方式（从枚举选择，不得留空。枚举值：`ui_text_assertion` / `ui_attribute_assertion` / `api_response_assertion` / `url_assertion` / `storage_assertion` / `screenshot_comparison` / `manual_visual_check` / `log_event_assertion` / `toast_alert_assertion` / `schema_assertion`）
 - `evidence_types`: 列表，从 UI / API / DB / Event / File / Message / Log / Metrics / External 中选择 ≥1 项
-- `automation`: `automatable` | `partial` | `manual`（父级默认；叶子 step 可单独覆盖）
 - `precondition`: 共享前置条件，**字符串**（多条用 `|` block scalar + `1. 2. 3.`），无则空字符串 `""`（原 `preconditions` 列表）
 - `steps`: 步骤列表；叶子 step = `{action, result, level}`，分组 step = `{action: <组名>, group: true, result: "", children: [<叶子 step>]}`（详见"type 决定下层结构"与"输出格式"）
 - `key_assets`: 关键资产说明列表（含逐字文案/规则枚举/集成契约描述）；**用自然语言写出资产本身，禁止出现内部代号**（代号登记到 `sub_refs` / `sources`）；无则写 `[]`
@@ -210,7 +209,6 @@ description: Use when generating functional test cases from confirmed requiremen
         source: 单字符串溯源标记（如 "L35" / "IR-009"）
         verbatim: true    # 可选；标记 result 中引号内文案需逐字断言
         status: blocked   # 可选；blocked / inferred；表示推测或被阻塞
-        automation: manual   # 可选；叶子 step 级覆盖父用例的 automation
   ```
   - **5-step ceiling**: 单个 children 叶子 step 的 `action` 不允许超过 5 个编号步骤；超出表明应升级为独立 `single` 用例
 - `sources`: 溯源数组
@@ -258,7 +256,6 @@ description: Use when generating functional test cases from confirmed requiremen
 - **合约清单交叉核验（强制）**: 生成完每个模块的全部用例后，逐条核对 Step 1 输出的合约/规则清单。每个输入校验规则集需有专用用例验证规则本身（不仅通过行为用例间接触发）；每个枚举值列表需逐项覆盖或以附录保留完整列表作为断言基准；每个顺序性阶段需有独立用例验证各阶段的展示内容与转换触发条件。未覆盖项立即补充后再进入 Step 3 去重
 - **证据类型标注自检（强制）**: 生成完每个模块的全部用例后，逐条检查每条用例的验证方式字段是否与 Step 1 证据分类标注一致。重点检查：弹窗或 Toast 类用例是否标注为 `toast_alert_assertion`，接口响应类用例是否标注为 `api_response_assertion`，结构化输出类用例是否标注为 `schema_assertion`，数据库或存储变更类用例是否标注为 `storage_assertion`，视觉布局类用例是否标注为 `manual_visual_check`。标注缺失或不匹配的立即修正后再进入 Step 3 去重
 - **访问上下文覆盖自检（强制）**: 生成完每个模块的全部用例后，回查 Step 1 输出的访问上下文清单。对每个独立上下文，检查是否有至少一组用例覆盖该上下文下的核心场景（入口展示、状态差异、导航行为、视觉资产）。如果某上下文完全没有用例或仅被其他上下文的用例间接提及，立即为该上下文补充独立用例后再进入 Step 3 去重
-- **自动化可行性标注自检（强制）**: 生成完每个模块的全部用例后，逐条检查每条用例是否标注了自动化可行性（automatable / partial / manual）。判断依据：验证方式为 `manual_visual_check` 或 `screenshot_comparison` 的用例标注为 manual 或 partial；验证方式涉及外部系统人工确认或物理设备操作的标注为 manual；其余可被自动化测试框架执行的标注为 automatable。标注缺失的立即补充后再进入 Step 3 去重
 - **中断恢复覆盖自检（强制）**: 生成完每个模块的全部用例后，回查该模块是否包含异步等待状态（如执行中、加载中、处理中、校验中等需要用户等待的中间态）。对每个含异步等待的功能，检查是否已生成页面刷新恢复、导航离开再返回等中断恢复用例（见"通用补充规则: 中断恢复场景"）。如果功能存在异步等待状态但无任何中断恢复用例，立即补充后再进入 Step 3 去重
 - **作用域受限浮层导航自检（强制）**: 生成完每个模块的全部用例后，检查该模块是否包含可见性取决于页面/路由上下文的浮层 UI（模态框、弹窗、横幅、覆盖层等——其展示或隐藏受当前页面是否属于生效范围控制）。对每个此类浮层，检查是否已为以下场景生成独立用例：(a) 浮层内部每个可触发页面跳转的交互元素的导航目标和浮层状态变化；(b) 未完成交互时导航至生效范围内页面的浮层持续展示；(c) 未完成交互时导航至生效范围外页面的浮层自动隐藏；(d) 未决策即离开后的状态非持久化验证（见"通用补充规则: 作用域受限 UI 元素的导航持久化"）。缺失则立即补充后再进入 Step 3 去重
 - **浮层多变体导航独立覆盖自检（强制）**: 当同一模块存在同一浮层组件的多个变体（不同触发条件、不同展示形态、不同作用域范围），或同一浮层在多个访问上下文中出现时，「作用域受限浮层导航自检」中的 (a)-(d) 场景必须为每个变体/上下文独立生成完整的用例集。不能仅为其中一个变体生成导航与持久化场景后将其他变体标注为“类似”“参照主变体”或合并覆盖——不同变体的作用域边界、导航行为和持久化语义可能存在差异，必须分别验证。如果某变体的导航场景完全缺失或仅被其他变体的用例间接提及，立即为该变体补充独立用例后再进入 Step 3 去重
@@ -416,18 +413,15 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 
 用户确认后更新 test_plan.md Phase 3 -> complete。
 
-确认完成后，检查 test_plan.md 的 Max Phase 字段：
-- 如果 Max Phase = Phase 3，向用户输出终止消息：
-  ```
-  功能测试用例已确认，Phase 3 完成。
-  当前 Max Phase = Phase 3，工作流在此终止。
-  如需继续自动化分析、脚本生成或测试报告，请将 test_plan.md 中的 Max Phase 更新为 Phase 4/5/6。
-  ```
-- 如果 Max Phase > 3 或未设置，正常提示用户可进入 Phase 4。
+确认完成后，向用户输出流程完成消息：
+```
+功能测试用例已确认，Phase 3 完成。
+本流程的终点为功能测试用例（functional-cases.yaml），工作流到此结束。
+```
 
 ## 输出格式 (functional-cases.yaml)
 
-**载体**：单一 YAML 文件 `.supertester/test-cases/functional-cases.yaml` 作为机器可读的唯一来源真理。所有下游 skill（automation-analysis / automation-scripting / test-reporting）和外部测试管理系统入库均从此文件解析。
+**载体**：单一 YAML 文件 `.supertester/test-cases/functional-cases.yaml` 作为机器可读的唯一来源真理。该文件作为功能测试用例的最终交付物，供人工执行、外部测试管理系统入库或其他下游消费方解析。
 
 **字段命名对齐既有用例库**：所有用例统一通过一个 `steps` 列表表达，每个叶子 step 是 `{action, result, level}`；分组（原 matrix 的 groups/rows）通过 `group: true` + `children` 表达，**没有 `groups` / `rows` / `branches` 字段**。优先级 `level` 只挂在叶子 step 上，**没有用例级 `priority` 字段**。
 
@@ -475,7 +469,6 @@ cases:
   sub_refs: [CMS-001, CL-012, CTX-B]   # 代号都进溯源字段，内容字段保持干净
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
-  automation: automatable
   precondition: |
     1. 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
     2. 账户安全手机原值 = "13800000000"，用户输入手机号 = "13911111111"（已修改）
@@ -502,7 +495,6 @@ cases:
   sub_refs: [C-004, C-005, E-001, CTX-B]   # key_assets/precondition 里删掉的代号在此登记
   verification_method: ui_text_assertion
   evidence_types: [UI, External]
-  automation: partial      # 父级默认；叶子 step 可单独覆盖
   precondition: 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
   key_assets:
     - 必填文案「请填写手机号」逐字断言
@@ -546,7 +538,6 @@ cases:
           result: 校验通过，无「请填写正确的手机号」错误提示
           level: P1
           source: L41
-          automation: automatable
         - action: |
             1. 区号选择 +86
             2. 手机号输入 "1380000abc"（含字母）
@@ -555,7 +546,6 @@ cases:
           level: P1
           source: L41
           verbatim: true
-          automation: automatable
         - action: |
             1. 区号选择 +852
             2. 手机号输入 "12345678"（8 位数字）
@@ -563,7 +553,6 @@ cases:
           result: 校验通过
           level: P1
           source: L41
-          automation: automatable
 
     - action: 必填
       group: true
@@ -574,7 +563,6 @@ cases:
           level: P1
           source: L40
           verbatim: true
-          automation: automatable
   sources:
     - { file: requirements.md, lines: "35-41" }
 ```
@@ -590,7 +578,6 @@ cases:
   sub_refs: [CMS-020, CTX-B]
   verification_method: api_response_assertion
   evidence_types: [UI, API, DB]
-  automation: partial
   precondition: 用户已登录且开通会员，进入信息确认页（距上次提交成功 >90 天的首次确认路径）
   steps:
     - action: |

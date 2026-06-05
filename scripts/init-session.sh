@@ -19,9 +19,7 @@ fi
 # Create directory structure
 mkdir -p "${SUPERTESTER_DIR}/requirements"
 mkdir -p "${SUPERTESTER_DIR}/test-cases"
-mkdir -p "${SUPERTESTER_DIR}/scripts"
 mkdir -p "${SUPERTESTER_DIR}/reviews"
-mkdir -p "${SUPERTESTER_DIR}/reports"
 
 # Copy templates
 cp "${PLUGIN_ROOT}/templates/test_plan.md" "${SUPERTESTER_DIR}/test_plan.md"
@@ -48,7 +46,5 @@ echo "  - progress.md    (session log)"
 echo ""
 echo "Output directories:"
 echo "  - requirements/  (Phase 1-2)"
-echo "  - test-cases/    (Phase 3-4)"
-echo "  - scripts/       (Phase 5)"
+echo "  - test-cases/    (Phase 3)"
 echo "  - reviews/       (test-reviewer records)"
-echo "  - reports/       (Phase 6)"

@@ -14,13 +14,13 @@ If you were dispatched as a subagent to execute a specific task, skip this skill
 1. **需求优先** — 不理解需求，不准生成任何测试
 2. **文件即记忆** — 所有信息写入 `.supertester/` 文件，不依赖上下文窗口
 3. **测试资产优先** — 测试不仅覆盖行为，还要保留关键规则、内容、状态断言、集成反馈和观测证据
-4. **两阶段生成** — 先人工用例，确认后再自动化脚本
+4. **用例即终点** — 本流程产出经审查并用户确认的功能测试用例，不涉及自动化分析与脚本生成
 5. **独立审查** — test-reviewer agent 审查，不自证清白
 6. **人工门禁** — 关键节点必须用户确认
 
 ## 工作目标
 
-Supertester 的目标不是只生成“看起来完整”的功能用例，而是生成一套可追踪、可审查、可自动化、且不丢关键测试资产的测试工件。
+Supertester（需求到用例版）的目标不是只生成“看起来完整”的功能用例，而是生成一套可追踪、可审查、且不丢关键测试资产的功能测试用例。流程从需求出发，终点为功能测试用例，不涉及自动化可行性分析、脚本生成与测试报告。
 
 任何阶段都必须同时关注两件事：
 - **行为覆盖**: 用户或系统的动作是否被测试到了
@@ -28,7 +28,7 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 
 如果只有行为覆盖，没有证据覆盖，后续最容易出现：
 - 功能主流程看起来已覆盖，但关键规则、内容、列表或状态变化被漏掉
-- 用例适合自动化，但不适合验收、排障或回归定位
+- 用例覆盖了流程，但不适合验收、排障或回归定位
 - 去重后数量变少，但高价值测试资产也一起丢失
 
 ## 初始化
@@ -56,12 +56,9 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 | 继续澄清 | requirement-analysis（恢复） | "继续澄清"、"恢复 CL-002" |
 | 分析模块关联 | requirement-association | "分析模块依赖" |
 | 生成功能用例 | test-case-generation | "生成登录模块的测试用例" |
-| 分析自动化可行性 | automation-analysis | "分析哪些可以自动化" |
-| 生成自动化脚本 | automation-scripting | "生成 Playwright 脚本" |
-| 生成报告 | test-reporting | "生成测试报告" |
 | 基于历史测试资产补充/修订/查缺补漏 | 先 requirement-analysis / requirement-association，再进入补充、修订和缺口补全 | "基于历史用例补充当前功能测试" |
 | 查询/问答 | 直接回答 | "checkout 模块需要哪些测试？" |
-| 请求超出 Max Phase 范围 | 阻止并提示用户更新 Max Phase | "生成 Playwright 脚本"（但 Max Phase = 3） |
+| 请求自动化分析 / 脚本生成 / 测试报告 | 告知用户本版本不提供，流程终点为功能测试用例 | "生成 Playwright 脚本" |
 
 如果用户提供了历史测试资产（历史用例、历史 case、测试清单、缺陷单、回归包），不要把它们只当参考材料。应优先把它们视为“业务历史逻辑与历史测试资产”，**在 Phase 1 就消化吸收**，用于补充、修订和查缺补漏，而不是把它们当成需要单独对比的一组产物：
 
@@ -85,31 +82,23 @@ Supertester 的目标不是只生成“看起来完整”的功能用例，而�
 | 1 | requirement-analysis | 需求文档 | parsed-requirements.md, clarifications.json |
 | 2 | requirement-association | Phase 1 complete | module-dependencies.md, implicit-requirements.md, cross-module-scenarios.md |
 | 3 | test-case-generation | Phase 2 complete + 用户确认 | functional-cases.yaml, deduplication-report.md |
-| 4 | automation-analysis | Phase 3 complete + 用户确认 | automation-analysis.yaml, automation-analysis.md |
-| 5 | automation-scripting | Phase 4 complete | *.spec.ts, manual-cases.md |
-| 6 | test-reporting | Phase 5 complete | reports/YYYY-MM-DD-*.md |
 
 每个阶段的关注重点：
 - **Phase 1**: 解析功能需求 + 抽取测试资产 + 明确证据类型 + 识别多语言/Prompt/测试数据资产 + 消化历史测试资产
 - **Phase 2**: 分析功能依赖 + 状态依赖 + 证据依赖 + 共享资源风险
-- **Phase 3**: 生成功能用例，同时保护关键测试资产不在简化或去重中丢失
-- **Phase 4-5**: 只自动化适合自动化的部分，不强行把所有测试资产都转成脚本
-- **Phase 6**: 报告不仅总结数量，还要说明覆盖维度、缺口和保留的人工测试部分
+- **Phase 3**: 生成功能用例，同时保护关键测试资产不在简化或去重中丢失。这是本流程的终点产物
 
 ## 流程终止控制 (Max Phase)
 
-`test_plan.md` 中的 **Max Phase** 字段控制工作流的终止阶段。达到该阶段后，`using-supertester` 将阻止进入后续 Phase 的请求，直到用户更新 Max Phase。
+`test_plan.md` 中的 **Max Phase** 字段控制工作流的终止阶段。达到该阶段后，`using-supertester` 将阻止进入后续 Phase 的请求，直到用户更新 Max Phase。本版本的最大 Phase 为 Phase 3（功能测试用例生成），不存在更后续的阶段。
 
 ### 工作流终止行为
 
 | Max Phase | 终止点 | 被阻止的技能 |
 |-----------|--------|-------------|
-| Phase 1 | 需求解析完成后 | requirement-association, test-case-generation, automation-analysis, automation-scripting, test-reporting |
-| Phase 2 | 关联分析完成后 | test-case-generation, automation-analysis, automation-scripting, test-reporting |
-| Phase 3 | 用例生成完成后 | automation-analysis, automation-scripting, test-reporting |
-| Phase 4 | 自动化分析完成后 | automation-scripting, test-reporting |
-| Phase 5 | 脚本生成完成后 | test-reporting |
-| Phase 6 (或不填) | 全部完成 | 无阻止 |
+| Phase 1 | 需求解析完成后 | requirement-association, test-case-generation |
+| Phase 2 | 关联分析完成后 | test-case-generation |
+| Phase 3 (或不填) | 用例生成完成后 | 无（已是流程终点） |
 
 ### Max Phase 检查规则
 
@@ -163,9 +152,7 @@ ATTEMPT 3: 更广泛地反思
 
 ```
 需求文档 → [Skill 1] 解析+澄清 → [Skill 2] 关联分析 → 审查 → 用户确认
-    → [Skill 3] 用例生成 → 审查 → 用户确认
-    → [Skill 4] 自动化分析 → [Skill 5] 脚本生成 → 审查
-    → [Skill 6] 报告生成
+    → [Skill 3] 用例生成 → 审查 → 用户确认（流程终点：functional-cases.yaml）
 ```
 
 ## 基于历史测试资产的补充、修订与查缺补漏

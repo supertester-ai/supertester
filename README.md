@@ -1,6 +1,6 @@
 # Supertester
 
-面向 Claude Code 的测试工作流插件。它把需求分析、测试设计、自动化可行性判断、脚本生成和最终报告串成一条可追踪、可恢复、可审查的流程，而不是一次性输出一批测试内容。
+面向 Claude Code 的测试工作流插件。它把需求分析、需求关联和功能测试用例生成串成一条可追踪、可恢复、可审查的流程，而不是一次性输出一批测试内容。
 
 当前仓库的核心不是传统 `src/` 应用，而是一套由 `skills/`、`hooks/`、`templates/` 和 `agents/` 组成的测试能力编排资产。
 
@@ -33,42 +33,37 @@ Supertester 提供了 Claude Code 可用的插件市场元数据。
 Supertester 适合这类场景：
 
 - 需要从需求文档稳定地产出功能测试用例
-- 希望把测试分析过程沉淀为可追踪文件，而不是只留在会话上下文里
-- 需要区分 `automatable`、`partial`、`manual`，而不是强行把所有场景自动化
-- 希望在生成测试资产前后都加入质量门禁，而不是“生成完就算完成”
+- 希望把需求分析过程沉淀为可追踪文件，而不是只留在会话上下文里
+- 需要先理清模块依赖、隐含需求和跨模块场景，再生成用例，而不是直接对单模块拍脑袋出题
+- 希望在生成用例前后都加入质量门禁，而不是“生成完就算完成”
 - 需要跨会话恢复测试设计工作，或者让不同 agent 协作完成同一条测试链路
 
 ## 核心设计
 
-- 需求优先：不理解需求，不进入后续测试资产生成
+- 需求优先：不理解需求，不进入后续用例生成
 - 文件持久化：关键决策和阶段产物写入 `.supertester/`
-- 分阶段生成：先功能测试设计，再自动化分析，再脚本生成
+- 分阶段推进：先需求解析与澄清，再需求关联分析，最后生成功能用例
 - 独立审查：由 `test-reviewer` 负责质量门禁，生成和审查角色分离
-- 保留人工资产：对视觉、媒体、复杂内容、人工判断场景保留 `manual` 或 `partial`
+- 保留高保真资产：对视觉、媒体、复杂内容、人工判断场景保留专门的验证方式，不被泛化抹平
 - 通用化规则：规则面向跨业务复用，不绑定某个具体产品域
 
 ## 工作流总览
 
-Supertester 当前采用 6 个主阶段：
+Supertester 当前采用 3 个主阶段，终点是功能测试用例：
 
 1. 需求解析与澄清
 2. 需求关联与跨模块分析
 3. 功能测试用例生成
-4. 自动化可行性分析
-5. Playwright 脚本生成
-6. 测试报告生成
 
 ```mermaid
 flowchart TD
     A["Phase 1<br/>Requirement Analysis"] --> B["Phase 2<br/>Requirement Association"]
     B --> C["Phase 3<br/>Test Case Generation"]
-    C --> D["Phase 4<br/>Automation Analysis"]
-    D --> E["Phase 5<br/>Automation Scripting"]
-    E --> F["Phase 6<br/>Test Reporting"]
-    C --> R["test-reviewer"]
-    E --> R
+    C --> D["Functional Test Cases"]
+    B --> R["test-reviewer"]
+    C --> R
+    R --> B
     R --> C
-    R --> E
 ```
 
 ## 高保真测试设计
@@ -123,7 +118,7 @@ flowchart LR
 - 列表、本体枚举、矩阵规则不再被随意抽样
 - loading、processing、staged feedback 不再只测最终态
 - 刷新、中断、重试、切换上下文后的恢复行为会被显式建模
-- 图片、Logo、媒体和布局类需求不会因为自动化困难而被静默丢弃
+- 图片、Logo、媒体和布局类需求会被保留为显式的人工验证用例，不被静默丢弃
 - prompt、schema、模板字段、输出路径等内容合约会被当作契约来测
 
 ## 审查机制
@@ -134,38 +129,11 @@ flowchart LR
 - 过程态是否只剩最终态验证
 - 中断与恢复是否漏测
 - 历史/列表交互是否漏掉分页、排序、滚动、空态
-- 视觉/媒体资产是否被保留为 `manual` 或 `partial`
+- 视觉/媒体资产是否被保留为专门的人工验证用例
 - prompt / schema / path / template 是否按合约验证
 - PRD 外业务资产是否进入覆盖范围
 
 其中一部分缺口会被直接提升为 `HIGH`，不能带着进入下一阶段。
-
-## 自动化边界说明
-
-Supertester 不要求所有测试都自动化。它会在 Phase 4 和 Phase 6 中明确区分：
-
-- `automatable`
-- `partial`
-- `manual`
-- `missing`
-
-这让最终报告不只回答"写了多少用例"，还会回答"哪些资产能自动化、哪些必须保留人工判断、哪些仍存在缺口"。
-
-```mermaid
-flowchart TD
-    A["Functional Cases"] --> B["Automation Analysis"]
-    B --> C["Automatable"]
-    B --> D["Partial"]
-    B --> E["Manual"]
-    C --> F["Playwright Scripts"]
-    D --> G["Script + Human Verification Notes"]
-    E --> H["Manual Verification Assets"]
-    F --> I["Final Test Report"]
-    G --> I
-    H --> I
-    B --> J["Missing or blocked coverage"]
-    J --> I
-```
 
 ## 仓库结构
 
@@ -189,9 +157,6 @@ supertester/
 - `requirement-analysis`
 - `requirement-association`
 - `test-case-generation`
-- `automation-analysis`
-- `automation-scripting`
-- `test-reporting`
 
 ## .supertester 产物目录
 
@@ -209,14 +174,10 @@ supertester/
 |   |-- implicit-requirements.md
 |   `-- cross-module-scenarios.md
 |-- test-cases/
-|   |-- functional-cases.md
-|   |-- automation-analysis.md
+|   |-- functional-cases.yaml
 |   `-- deduplication-report.md
-|-- scripts/
-|   |-- *.spec.ts
-|   `-- manual-cases.md
-|-- reviews/
-`-- reports/
+`-- reviews/
+    `-- review-*.md
 ```
 
 这套目录结构的意义，不只是"把结果写出来"，而是把测试设计过程也保存下来，方便后续恢复、审查和追溯。
@@ -230,10 +191,7 @@ supertester/
 - `using-supertester`：入口初始化、路由与状态恢复
 - `requirement-analysis`：需求解析、歧义发现、结构化澄清
 - `requirement-association`：模块依赖、隐含需求、跨模块场景和恢复/历史交互分析
-- `test-case-generation`：功能测试用例生成、保真度策略分配、去重
-- `automation-analysis`：自动化可行性判断
-- `automation-scripting`：Playwright 脚本生成
-- `test-reporting`：汇总覆盖、边界和最终报告
+- `test-case-generation`：功能测试用例生成、保真度策略分配、去重（终点产物）
 
 ### Hooks
 
@@ -251,7 +209,7 @@ supertester/
 - 覆盖缺口
 - 结构问题
 - 高保真资产丢失
-- 自动化边界误判
+- 需求溯源缺失或错误
 
 ## 快速开始
 
@@ -264,7 +222,7 @@ supertester/
 或者从中间阶段继续：
 
 ```text
-基于现有功能用例，继续做自动化可行性分析
+基于现有需求解析结果，继续做需求关联分析
 ```
 
 典型执行过程会是：
@@ -272,24 +230,24 @@ supertester/
 1. 初始化 `.supertester/`
 2. 解析需求并产出结构化结果
 3. 对歧义和 PRD 外关键规则进行澄清
-4. 生成功能测试用例并经过 reviewer 审查
-5. 分析自动化边界并生成脚本
-6. 输出覆盖结构清晰的最终报告
+4. 分析模块依赖、隐含需求和跨模块场景，并经过 reviewer 审查
+5. 生成功能测试用例并经过 reviewer 审查
+6. 用户确认后产出最终的功能用例（`functional-cases.yaml`）
 
 ## 适用边界
 
 适合：
 
-- 需求驱动的测试设计
-- Web 产品的 E2E 测试规划与自动化脚本生成
+- 需求驱动的功能测试用例设计
+- 需要从需求文档稳定产出结构化功能用例的团队
 - 需要追踪测试资产和决策链路的团队
-- 需要保留人工校验资产而不是强推全自动化的场景
+- 需要保留高保真人工校验资产而不是把细节泛化抹平的场景
 
 不等同于：
 
 - 一个完整的测试执行平台
 - 一个内置业务运行时代码的传统 Node 应用
-- 一个所有场景都自动跑完的全托管测试系统
+- 一个自动生成并运行测试脚本的端到端自动化系统
 
 ## 参考文档
 
