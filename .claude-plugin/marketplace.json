@@ -8,7 +8,7 @@
     {
       "name": "supertester",
       "description": "AI-driven software testing workflow plugin: from requirements to functional test cases",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "source": "./"
     }
   ]
