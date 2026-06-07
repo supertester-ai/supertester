@@ -253,8 +253,6 @@ supertester/
 
 - [安装指南](docs/installation.md)
 - [设计说明](docs/design.md)
-- [差异分析](docs/2026-04-08-comparison.md)
-- [反向优化分析](docs/2026-04-09-supertester-optimization-analysis.md)
 
 ## License
 

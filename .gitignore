@@ -20,3 +20,13 @@ temp/
 
 # Verification workspace (per-run output, not part of repo)
 /verification/
+/.omx/logs/tmux-hook-2026-04-23.jsonl
+/.omx/logs/tmux-hook-2026-04-24.jsonl
+/.omx/logs/turns-2026-04-23.jsonl
+/.omx/logs/turns-2026-04-24.jsonl
+/.omx/state/hud-state.json
+/.omx/state/notify-hook-state.json
+/.omx/state/skill-active-state.json
+/.omx/state/team-leader-nudge.json
+/.omx/state/tmux-hook-state.json
+/.omx/metrics.json
