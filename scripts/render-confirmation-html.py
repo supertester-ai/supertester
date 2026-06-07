@@ -17,64 +17,65 @@ import html
 import json
 import os
 import re
+import webbrowser
 from pathlib import Path
 from typing import Iterable
 
 
 PHASE_CONFIG = {
     "1": {
-        "title": "Phase 1 Confirmation - Requirement Analysis",
-        "phase": "Phase 1: Requirement Analysis",
+        "title": "阶段一 确认页 · 需求解析",
+        "phase": "阶段一：需求解析",
         "output": "phase-1-confirmation.html",
         "checklist": [
             "功能模块、功能点、验收标准、边界条件已经结构化落盘。",
             "关键测试资产、证据类型、规则/枚举/内容资产已经展开，不以示例替代完整需求。",
             "所有关键模糊项已澄清；如仍有 pending/blocked 项，已在页面中明确暴露。",
-            "用户确认后才允许进入 Phase 2 requirement-association。",
+            "用户确认后才允许进入 阶段二 需求关联分析。",
         ],
         "files": [
-            ("Parsed Requirements", "requirements/parsed-requirements.md"),
-            ("Clarifications", "requirements/clarifications.json"),
-            ("Findings", "findings.md"),
-            ("Test Plan", "test_plan.md"),
+            ("解析后的需求", "requirements/parsed-requirements.md"),
+            ("澄清记录", "requirements/clarifications.json"),
+            ("分析发现", "findings.md"),
+            ("测试计划", "test_plan.md"),
         ],
     },
     "2": {
-        "title": "Phase 2 Confirmation - Requirement Association",
-        "phase": "Phase 2: Requirement Association",
+        "title": "阶段二 确认页 · 需求关联分析",
+        "phase": "阶段二：需求关联分析",
         "output": "phase-2-confirmation.html",
         "checklist": [
             "功能依赖、状态依赖、证据依赖和共享资源风险已经覆盖。",
             "隐含需求、PRD 外运营边界和 blocked/pending 项已明确列出。",
-            "跨模块场景不仅包含 happy path，也包含中断恢复、历史列表、错误传播和证据链。",
-            "test-reviewer 审查摘要已纳入页面；用户确认后才允许进入 Phase 3。",
+            "跨模块场景不仅包含正常主流程，也包含中断恢复、历史列表、错误传播和证据链。",
+            "test-reviewer 审查摘要已纳入页面；用户确认后才允许进入 阶段三。",
         ],
         "files": [
-            ("Module Dependencies", "requirements/module-dependencies.md"),
-            ("Implicit Requirements", "requirements/implicit-requirements.md"),
-            ("Cross-Module Scenarios", "requirements/cross-module-scenarios.md"),
-            ("Latest Association Review", "reviews/review-association-*.md"),
-            ("Findings", "findings.md"),
+            ("模块依赖", "requirements/module-dependencies.md"),
+            ("隐含需求", "requirements/implicit-requirements.md"),
+            ("跨模块场景", "requirements/cross-module-scenarios.md"),
+            ("最新关联分析审查", "reviews/review-association-*.md"),
+            ("分析发现", "findings.md"),
         ],
     },
     "3": {
-        "title": "Phase 3 Confirmation - Functional Test Cases",
-        "phase": "Phase 3: Functional Test Cases",
+        "title": "阶段三 确认页 · 功能测试用例",
+        "phase": "阶段三：功能测试用例",
         "output": "phase-3-confirmation.html",
         "checklist": [
-            "coverage-matrix.md 已展示完整、部分、缺失和 blocked 覆盖状态。",
-            "functional-cases.yaml 已通过自包含校验和 reviewer 审查。",
+            "覆盖矩阵 已展示完整、部分、缺失和 blocked 覆盖状态。",
+            "功能测试用例 已通过自包含校验和 reviewer 审查。",
             "用例统计、类型分布、P0/P1/P2 优先级分布和关键缺口已暴露。",
-            "用户确认后，Phase 3 才算完成；本工作流到功能测试用例为止。",
+            "用户确认后，阶段三 才算完成；本工作流到功能测试用例为止。",
         ],
         "files": [
-            ("Coverage Matrix", "test-cases/coverage-matrix.md"),
-            ("Functional Cases", "test-cases/functional-cases.yaml"),
-            ("Deduplication Report", "test-cases/deduplication-report.md"),
-            ("Test Surface Plan", "test-cases/test-surface-plan.md"),
-            ("Design Artifacts", "test-cases/design-artifacts.md"),
-            ("Latest Test Case Review", "reviews/review-test-cases-*.md"),
-            ("Findings", "findings.md"),
+            ("覆盖矩阵", "test-cases/coverage-matrix.md"),
+            ("功能测试用例", "test-cases/functional-cases.yaml"),
+            ("去重报告", "test-cases/deduplication-report.md"),
+            ("测试面规划", "test-cases/test-surface-plan.md"),
+            ("设计产物", "test-cases/design-artifacts.md"),
+            ("最新测试用例审查", "reviews/review-test-cases-*.md"),
+            ("分析发现", "findings.md"),
         ],
     },
 }
@@ -220,7 +221,7 @@ def render_source_cards(files: Iterable[tuple[str, Path | None]], project_dir: P
         if path is None:
             cards.append(
                 f'<div class="source-card missing"><strong>{html.escape(label)}</strong>'
-                "<span>Missing or not generated yet</span></div>"
+                "<span>缺失或尚未生成</span></div>"
             )
             continue
         meta = file_meta(path, project_dir)
@@ -228,7 +229,7 @@ def render_source_cards(files: Iterable[tuple[str, Path | None]], project_dir: P
             '<div class="source-card ready">'
             f"<strong>{html.escape(label)}</strong>"
             f"<span>{html.escape(meta['path'])}</span>"
-            f"<span>Modified: {html.escape(meta['mtime'])}</span>"
+            f"<span>修改时间：{html.escape(meta['mtime'])}</span>"
             f"<span>{html.escape(meta['size'])}</span>"
             "</div>"
         )
@@ -240,16 +241,16 @@ def render_body(config: dict, files: list[tuple[str, Path | None]], project_dir:
     checklist = "\n".join(f"<li>{html.escape(item)}</li>" for item in config["checklist"])
     sections.append(
         (
-            "Review Gate",
-            '<section class="panel"><h2>Review Gate</h2>'
-            '<p><span class="status">Needs human confirmation</span></p>'
+            "审查门禁",
+            '<section class="panel"><h2>审查门禁</h2>'
+            '<p><span class="status">待人工确认</span></p>'
             f'<ul class="checklist">{checklist}</ul></section>',
         )
     )
     sections.append(
         (
-            "Source Files",
-            '<section class="panel"><h2>Source Files</h2><div class="source-grid">'
+            "源文件清单",
+            '<section class="panel"><h2>源文件清单</h2><div class="source-grid">'
             + render_source_cards(files, project_dir)
             + "</div></section>",
         )
@@ -267,8 +268,8 @@ def render_body(config: dict, files: list[tuple[str, Path | None]], project_dir:
         )
     sections.append(
         (
-            "Confirmation",
-            '<section class="panel"><h2>Confirmation</h2>'
+            "确认",
+            '<section class="panel"><h2>确认</h2>'
             "<p>请审查本页面内容。确认通过后，在对话中明确回复确认该阶段，Supertester 才能更新 test_plan.md 并进入下一步。</p>"
             '<p class="footer-note">此 HTML 是确认视图；Markdown/YAML/JSON 源文件仍是可追踪来源。</p>'
             "</section>",
@@ -289,6 +290,11 @@ def main() -> int:
     parser.add_argument("--phase", required=True, choices=sorted(PHASE_CONFIG))
     parser.add_argument("--project-dir", default=".")
     parser.add_argument("--template", default=None)
+    parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="生成后不自动用本地浏览器打开确认页（默认会自动打开）",
+    )
     args = parser.parse_args()
 
     project_dir = Path(args.project_dir).resolve()
@@ -322,7 +328,46 @@ def main() -> int:
     out_path = out_dir / config["output"]
     out_path.write_text(output, encoding="utf-8")
     print(out_path)
+
+    if not args.no_open:
+        open_in_browser(out_path)
     return 0
+
+
+def open_in_browser(out_path: Path) -> None:
+    """尽量用本地默认浏览器打开确认页，失败时只打印提示，不影响主流程。"""
+    url = out_path.resolve().as_uri()
+    try:
+        opened = webbrowser.open(url)
+    except Exception:
+        opened = False
+    if opened:
+        print(f"已尝试在本地浏览器打开确认页：{url}")
+        return
+    # webbrowser 在部分平台/无头环境返回 False，回退到平台命令。
+    import shutil
+    import subprocess
+
+    candidates = []
+    if os.name == "nt":
+        candidates.append(["cmd", "/c", "start", "", str(out_path)])
+    candidates.append(["open", str(out_path)])      # macOS
+    candidates.append(["xdg-open", str(out_path)])  # Linux
+    candidates.append(["wslview", str(out_path)])   # WSL
+    for cmd in candidates:
+        if shutil.which(cmd[0]) is None:
+            continue
+        try:
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print(f"已尝试在本地浏览器打开确认页：{url}")
+            return
+        except Exception:
+            continue
+    print(f"未能自动打开浏览器，请手动打开确认页：{out_path}")
 
 
 if __name__ == "__main__":

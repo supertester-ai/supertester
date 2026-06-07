@@ -13,6 +13,8 @@ description: Use when analyzing requirement documents - parses requirements, det
 <HARD-GATE>
 在所有模糊项澄清完毕之前，不准进入 requirement-association 阶段。
 这适用于所有需求文档，无论看起来多清晰。
+Phase 1 产物生成后，必须停下等待用户明确确认，禁止自动开始 Phase 2。
+只有用户确认后才能把 Phase 1 标为 complete，并在用户给出下一步意图后才进入 requirement-association。
 </HARD-GATE>
 
 ## 流程
@@ -177,8 +179,8 @@ requirements.md       |
 完成解析和澄清后：
 1. 写入 `.supertester/requirements/parsed-requirements.md`
 2. 写入 `.supertester/requirements/clarifications.json`（如有澄清）
-3. 生成 `.supertester/confirmations/phase-1-confirmation.html`
-4. 向用户展示确认页路径，并等待用户确认
+3. 生成 `.supertester/confirmations/phase-1-confirmation.html`（脚本默认自动用本地浏览器打开）
+4. 向用户展示确认页路径、告知已在浏览器中打开，并等待用户确认
 5. 用户确认后，更新 `.supertester/test_plan.md` Phase 1 Status -> complete
 6. 更新 `.supertester/findings.md` 需求发现
 7. 更新 `.supertester/progress.md` 操作日志
@@ -189,7 +191,7 @@ requirements.md       |
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase 1 --project-dir .
 ```
 
-如果宿主环境没有 `CLAUDE_PLUGIN_ROOT`，使用插件脚本的实际路径执行同等命令。没有生成 HTML 确认页之前，不得把 Phase 1 标记为 complete，不得进入 requirement-association。
+如果宿主环境没有 `CLAUDE_PLUGIN_ROOT`，使用插件脚本的实际路径执行同等命令。该脚本默认会自动用本地默认浏览器打开生成的确认页，确认页内容全部为中文；除非处于纯无头环境，否则不要附加 `--no-open`。没有生成 HTML 确认页之前，不得把 Phase 1 标记为 complete，不得进入 requirement-association。
 
 ## 2-Action Rule 落地
 

@@ -12,6 +12,8 @@ description: Use when analyzing module dependencies and cross-module scenarios -
 
 <HARD-GATE>
 Do not proceed to `test-case-generation` until the user confirms the association analysis results.
+After the Phase 2 artifacts are generated, stop and wait for the user's explicit confirmation — never auto-start Phase 3.
+Only mark Phase 2 `complete` after the user confirms, and only enter `test-case-generation` once the user signals the next step.
 </HARD-GATE>
 
 ## Preconditions
@@ -272,9 +274,9 @@ Before asking the user to confirm, generate the human-readable confirmation page
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase 2 --project-dir .
 ```
 
-If `CLAUDE_PLUGIN_ROOT` is unavailable, run the same command with the actual plugin script path.
+If `CLAUDE_PLUGIN_ROOT` is unavailable, run the same command with the actual plugin script path. The script renders all confirmation-page content in Chinese and, by default, automatically opens the page in the local default browser so the user can see this key-gate content. Do not pass `--no-open` unless running in a headless/CI environment.
 
-Then show the user the HTML path:
+Then show the user the HTML path and tell them it has been opened in the browser:
 
 `.supertester/confirmations/phase-2-confirmation.html`
 

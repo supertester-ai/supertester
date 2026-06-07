@@ -189,13 +189,15 @@ supertester/
 
 ### HTML 确认页
 
-隐藏目录里的 Markdown/YAML/JSON 仍然是来源真理，但每个阶段提交人工确认前会额外生成一份 HTML 审查页，集中展示该阶段需要确认的内容、缺失项、blocked 项和 reviewer 摘要。
+隐藏目录里的 Markdown/YAML/JSON 仍然是来源真理，但每个阶段提交人工确认前会额外生成一份 HTML 审查页，集中展示该阶段需要确认的内容、缺失项、blocked 项和 reviewer 摘要。确认页的标题、章节、状态等内容统一使用中文呈现。
 
 ```bash
 python3 scripts/render-confirmation-html.py --phase 1 --project-dir /path/to/project
 python3 scripts/render-confirmation-html.py --phase 2 --project-dir /path/to/project
 python3 scripts/render-confirmation-html.py --phase 3 --project-dir /path/to/project
 ```
+
+脚本默认会在生成后**自动用本地默认浏览器打开**确认页，让用户在关键流程环节直接看到待确认内容（在 macOS / Windows / Linux / WSL 上分别回退到 `open` / `start` / `xdg-open` / `wslview`）。在纯无头或 CI 环境下，可附加 `--no-open` 跳过自动打开。
 
 HTML 模板位于 `templates/confirmation.html`，渲染脚本只使用 Python 标准库，便于在不同项目中稳定复用。
 

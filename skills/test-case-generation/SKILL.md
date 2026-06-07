@@ -507,9 +507,9 @@ CRITICAL/HIGH 问题 -> 修复后重新审查（最多 3 轮）
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase 3 --project-dir .
 ```
 
-如果 `CLAUDE_PLUGIN_ROOT` 不可用，使用插件脚本的实际路径执行同等命令。
+如果 `CLAUDE_PLUGIN_ROOT` 不可用，使用插件脚本的实际路径执行同等命令。该脚本默认会自动用本地默认浏览器打开确认页，确认页内容全部以中文呈现；除非处于纯无头环境，否则不要附加 `--no-open`。
 
-向用户请求确认时必须给出：
+向用户请求确认时必须给出确认页路径并告知已在浏览器中打开：
 
 `.supertester/confirmations/phase-3-confirmation.html`
 
