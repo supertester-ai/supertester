@@ -28,6 +28,19 @@ You must produce a structured review record saved to `.supertester/reviews/revie
 - Are cross-module scenarios (`CMS-xxx`) complete?
 - Are any requirements completely uncovered? This is **CRITICAL**.
 
+### 1a. Test Surface Planning Review (Phase 3)
+
+Before judging individual cases, inspect the Phase 3 planning artifacts:
+
+- `.supertester/test-cases/test-surface-plan.md` MUST exist and include both the Test Surface Plan table and the Test Dimension Radar.
+- `.supertester/test-cases/coverage-matrix.md` MUST exist before user confirmation.
+- `.supertester/test-cases/design-artifacts.md` MUST exist when requirements involve complex business rules, state machines, role/permission matrices, field validation matrices, orthogonal compression, or cross-module evidence chains.
+- The Test Surface Plan must cover every explicit platform, device, role, permission condition, access context, page/subfunction, language/region/environment variant, and evidence type from `parsed-requirements.md` and Phase 2 artifacts.
+- The Test Dimension Radar must evaluate all 7 dimensions for every `F-xxx`: business rules, UI/interaction, field validation, state lifecycle, role/permission, exception/negative, cross-module consistency.
+- A dimension marked applicable must trace to at least one case, matrix children leaf step, scenario_chain, or documented `blocked` item. Applicable but uncovered dimensions are **HIGH** issues.
+- A platform/role/context/variant that appears in requirements but is absent from `test-surface-plan.md` is **HIGH**; if that omission leaves an entire requirement untestable, classify as **CRITICAL**.
+- `coverage-matrix.md` rows marked `部分` / `缺失` / `blocked` (or `partial` / `missing` / `blocked`) must have explicit linked cases, findings, clarifications, IR IDs, or review issues. Blank cells for applicable dimensions are **HIGH**.
+
 ### 2. Test Case Quality Review (Phase 3)
 
 - **Self-containment validator (deterministic, MANDATORY):** before any other Phase 3 check, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-self-contained.py" .supertester/test-cases/functional-cases.yaml` and capture both stdout and the exit code. The review verdict MUST be `FAIL` whenever the validator exits non-zero. Paste the validator summary line into the review record's `## Metadata` section as `Self-containment Validator: PASS|FAIL (N violations)`, and lift each reported `(case_id, field, code, snippet)` into the Issues table as a CRITICAL self-containment finding (do not delegate this to the manual self-containment radar — the validator is the source of truth). Reviewer is NOT allowed to write `Verdict: PASS` while violations exist, nor to argue around individual violations on stylistic grounds.
@@ -115,10 +128,21 @@ This is the new P0 review layer. You must actively search for these gaps.
 #### F. Contract Content Gaps
 
 - If the requirement includes prompt templates, output schemas, file/path formats, or template field rules, are they treated as contract checks rather than vague result checks?
+- If the requirement includes price, amount, fee, balance, discount, tax, shipping, payment, refund, recharge, or settlement fields, do cases verify the submitted API/server/payment amount contract rather than only the formatted UI display?
+- For price/amount fields at or above the thousands boundary, is there a case proving formatted display values such as `"1,234.56"` are not passed verbatim to the backend?
+- Are currency symbols, currency codes, locale separators, decimal precision, integer-minor-unit conversion, rounding/truncation, negative/zero/empty/oversized amounts, scientific notation, NaN/Infinity, full-width symbols, and copy-paste whitespace handled or explicitly ruled out?
+- If a payment gateway rejects an amount format or precision, do cases verify order/payment state consistency, error messaging, retry entry, and logs?
 
 #### G. PRD-External Business Asset Gaps
 
 - If `parsed-requirements.md` records ops toggles, legacy behavior, removed flows, or compatibility rules, are these reflected in coverage?
+
+#### H. Test Surface / Dimension Gaps
+
+- Does `test-surface-plan.md` include all explicit 端/平台、角色/权限、访问上下文、页面/子功能、语言/地区/环境变体?
+- Does each Test Dimension Radar row marked applicable have concrete coverage in `functional-cases.yaml`?
+- Are UI/interaction, permissions, negative/exception, or cross-module consistency dimensions incorrectly marked not applicable?
+- If `coverage-matrix.md` marks a dimension as complete, can that claim be traced to specific cases or matrix leaf steps?
 
 ## Severity Rules
 
@@ -143,7 +167,14 @@ Classify as **HIGH** when:
 - explicit loading/process requirements are reduced to final-state checks only
 - explicit visual assets are omitted instead of preserved as manual/partial verification
 - prompt/schema/path/template contracts are not treated as contracts
+- price/amount fields are tested only for UI display while API/server/payment submitted values are not verified
+- price/amount fields lack the thousands-separator regression case for formatted display values such as `"1,234.56"` being mistakenly submitted
+- payment/settlement amount format failures lack order/payment state consistency checks
 - PRD-external business assets are present in the baseline but absent in coverage
+- `test-surface-plan.md` or `coverage-matrix.md` is missing in Phase 3 review
+- a required platform, role, access context, page/subfunction, language/region/environment variant, or evidence type is absent from `test-surface-plan.md`
+- a Test Dimension Radar item is marked applicable but has no corresponding case, matrix children leaf step, scenario_chain, or blocked record
+- `coverage-matrix.md` claims complete coverage that cannot be traced to concrete cases or leaf steps
 - under-aggregation: ≥3 sibling singles that should have collapsed into a matrix (see 2a.A)
 - over-aggregation: a matrix that mixes verification_methods, evidence_types, or carries an action exceeding the 5-step ceiling (see 2a.B)
 - a children leaf step lacks `source`, or a `verbatim: true` leaf step's `result` does not contain the literal copy
@@ -192,7 +223,23 @@ Classify as **HIGH** when:
 - **History / List Interaction:** PASS | FAIL
 - **Visual Asset Handling:** PASS | FAIL
 - **Contract Content:** PASS | FAIL
+- **Price/Amount Transfer Contract:** PASS | FAIL | N/A
 - **PRD-External Business Assets:** PASS | FAIL
+- **Test Surface Planning:** PASS | FAIL
+- **7-Dimension Radar:** PASS | FAIL
+- **Coverage Matrix Traceability:** PASS | FAIL
+
+## Test Surface Planning Check (Phase 3)
+- **test-surface-plan.md exists:** PASS | FAIL
+- **coverage-matrix.md exists:** PASS | FAIL
+- **design-artifacts.md required/present:** PASS | FAIL | N/A
+- **Platform/device coverage:** PASS | FAIL
+- **Role/permission coverage:** PASS | FAIL
+- **Access context coverage:** PASS | FAIL
+- **Page/subfunction coverage:** PASS | FAIL
+- **Variant coverage (language/region/environment):** PASS | FAIL
+- **Evidence type coverage:** PASS | FAIL
+- **Applicable dimensions traced to cases:** PASS | FAIL
 
 ## Matrix Aggregation Check (Phase 3)
 - **Under-aggregation (零散派生):** PASS | FAIL

@@ -39,6 +39,9 @@ requirements.md       |
     +----------------+
     |
     v
+生成 HTML 确认页 -> 用户确认
+    |
+    v
 更新 test_plan.md Phase 1 -> complete
 更新 findings.md 需求发现
 更新 progress.md 操作日志
@@ -91,6 +94,13 @@ requirements.md       |
 5. **约束与合约资产**
    - 输入约束、输出格式、结构化 schema、权限边界、审计规则、生成规则、策略配置
    - 只要系统存在“必须遵守的规则”，就要把规则本身当成可测试资产，而不是只测试表层流程
+   - **价格/金额字段传输契约强制提取：** 当需求涉及价格、金额、费用、余额、折扣、税费、运费、支付、退款、充值、结算等字段时，必须把这些字段作为高风险合约资产逐项记录：
+     - 展示值格式（是否带千分位分隔符、货币符号、币种码、空格、本地化小数点/分组符）
+     - 提交值格式（服务端期望纯数字字符串、decimal、整数分、minor unit、是否允许逗号/符号）
+     - 精度与舍入规则（小数位、四舍五入/截断、最大金额、最小金额、0 和负数处理）
+     - 前端格式化/反格式化规则（显示格式化值不得直接作为 API 入参）
+     - 货币/区域差异（USD/CNY/JPY 等小数位差异，逗号/点号在不同 locale 下的含义）
+     - 支付/订单/结算接口的金额字段名、单位、校验错误返回和失败兜底
 
 6. **证据类型资产**
    - 对每个功能标记验证证据来自哪里：UI / API / DB / Event / File / Message / Log / Metrics / External System
@@ -167,9 +177,19 @@ requirements.md       |
 完成解析和澄清后：
 1. 写入 `.supertester/requirements/parsed-requirements.md`
 2. 写入 `.supertester/requirements/clarifications.json`（如有澄清）
-3. 更新 `.supertester/test_plan.md` Phase 1 Status -> complete
-4. 更新 `.supertester/findings.md` 需求发现
-5. 更新 `.supertester/progress.md` 操作日志
+3. 生成 `.supertester/confirmations/phase-1-confirmation.html`
+4. 向用户展示确认页路径，并等待用户确认
+5. 用户确认后，更新 `.supertester/test_plan.md` Phase 1 Status -> complete
+6. 更新 `.supertester/findings.md` 需求发现
+7. 更新 `.supertester/progress.md` 操作日志
+
+生成确认页命令：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase 1 --project-dir .
+```
+
+如果宿主环境没有 `CLAUDE_PLUGIN_ROOT`，使用插件脚本的实际路径执行同等命令。没有生成 HTML 确认页之前，不得把 Phase 1 标记为 complete，不得进入 requirement-association。
 
 ## 2-Action Rule 落地
 
@@ -302,3 +322,5 @@ requirements.md       |
 - 高价值测试资产已抽取，不仅仅是功能描述
 - 已标记主要证据类型
 - 已保留完整规则、列表、内容或数据断言，不以“示例”替代完整需求
+- `.supertester/confirmations/phase-1-confirmation.html` 已生成并提交给用户审查
+- 用户已明确确认 Phase 1 结果

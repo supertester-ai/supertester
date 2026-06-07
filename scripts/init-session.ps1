@@ -18,7 +18,7 @@ if (Test-Path $SupertesterDir) {
 }
 
 # Create directory structure
-$dirs = @("requirements", "test-cases", "reviews")
+$dirs = @("requirements", "test-cases", "reviews", "confirmations")
 foreach ($dir in $dirs) {
     New-Item -ItemType Directory -Path (Join-Path $SupertesterDir $dir) -Force | Out-Null
 }
@@ -43,3 +43,4 @@ Write-Host "Output directories:"
 Write-Host "  - requirements/  (Phase 1-2)"
 Write-Host "  - test-cases/    (Phase 3)"
 Write-Host "  - reviews/       (test-reviewer records)"
+Write-Host "  - confirmations/ (human-readable HTML review gates)"

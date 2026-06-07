@@ -26,6 +26,8 @@ Phase 3
 - [ ] 检测模糊项并发起澄清对话
 - [ ] 生成 parsed-requirements.md
 - [ ] 更新 findings.md
+- [ ] 生成 HTML 确认页（.supertester/confirmations/phase-1-confirmation.html）
+- [ ] 用户确认
 - **Completion Gate:** 功能项、关键测试资产、主要证据类型均已落盘
 - **Status:** pending
 
@@ -37,6 +39,7 @@ Phase 3
 - [ ] 挖掘隐含需求
 - [ ] 生成跨模块测试场景
 - [ ] test-reviewer 审查
+- [ ] 生成 HTML 确认页（.supertester/confirmations/phase-2-confirmation.html）
 - [ ] 用户确认
 - **Completion Gate:** 已覆盖功能链、状态链、证据链、共享资源风险
 - **Status:** pending
@@ -49,6 +52,7 @@ Phase 3
 - [ ] 去重
 - [ ] 检查关键测试资产是否在生成或去重中丢失
 - [ ] test-reviewer 审查（含矩阵聚合合理性 + verbatim 完整性）
+- [ ] 生成 HTML 确认页（.supertester/confirmations/phase-3-confirmation.html）
 - [ ] 用户确认
 - **Completion Gate:** 行为覆盖与证据覆盖均可追踪，关键测试资产未丢失，无零散派生 single 群
 - **Status:** pending

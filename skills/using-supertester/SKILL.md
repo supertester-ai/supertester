@@ -36,7 +36,7 @@ Supertester（需求到用例版）的目标不是只生成“看起来完整”
 检查 `.supertester/` 目录：
 
 **不存在：**
-1. 创建 `.supertester/` 及子目录 (requirements/, test-cases/, scripts/, reviews/, reports/)
+1. 创建 `.supertester/` 及子目录 (requirements/, test-cases/, reviews/, confirmations/)
 2. 从 templates/ 复制 test_plan.md, findings.md, progress.md
 3. 在 test_plan.md 的 Goal 中填写用户的测试目标
 4. 检查 test_plan.md 的 Max Phase 字段：如果用户明确只需要到某个阶段（如 Phase 3），将 Max Phase 设为对应值；否则保持默认值
@@ -121,6 +121,30 @@ Supertester（需求到用例版）的目标不是只生成“看起来完整”
 - **test_plan.md** — 阶段追踪 + 决策 + 错误记录。每次阶段变更、重大决策、错误发生时更新。
 - **findings.md** — 分析发现 + 知识库。遵守 2-Action Rule。
 - **progress.md** — 会话日志 + 时间线。每完成操作后更新。
+
+### HTML 确认页
+
+每个阶段进入“用户确认”前，必须生成可直接打开审查的 HTML 页面，而不是只让用户去隐藏目录里翻 Markdown。
+
+生成命令（在目标项目根目录执行）：
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase <1|2|3> --project-dir .
+```
+
+如果 `CLAUDE_PLUGIN_ROOT` 不可用，使用当前插件仓库中的脚本路径：
+
+```bash
+python3 /path/to/supertester/scripts/render-confirmation-html.py --phase <1|2|3> --project-dir .
+```
+
+输出路径固定为：
+
+- Phase 1: `.supertester/confirmations/phase-1-confirmation.html`
+- Phase 2: `.supertester/confirmations/phase-2-confirmation.html`
+- Phase 3: `.supertester/confirmations/phase-3-confirmation.html`
+
+确认页必须包含待确认产物、关键 checklist、缺失/blocked 项和 reviewer 摘要（如该阶段有 reviewer）。向用户请求确认时，必须同时给出 HTML 文件路径。用户明确确认后，才允许把对应 Phase 标为 complete。
 
 ### 2-Action Rule
 

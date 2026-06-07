@@ -47,6 +47,9 @@ Cross-module scenario generation -> cross-module-scenarios.md
 test-reviewer audit -> reviews/review-association-*.md
     |
     v
+Generate confirmation HTML -> .supertester/confirmations/phase-2-confirmation.html
+    |
+    v
 User confirmation
     |
     v
@@ -263,14 +266,26 @@ Save the result to `.supertester/reviews/review-association-<timestamp>.md`.
 
 ## Step 5: User Confirmation
 
-Show the user:
+Before asking the user to confirm, generate the human-readable confirmation page:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render-confirmation-html.py" --phase 2 --project-dir .
+```
+
+If `CLAUDE_PLUGIN_ROOT` is unavailable, run the same command with the actual plugin script path.
+
+Then show the user the HTML path:
+
+`.supertester/confirmations/phase-2-confirmation.html`
+
+The page must include:
 
 1. dependency summary
 2. implicit requirements summary
 3. cross-module scenarios summary
 4. reviewer summary
 
-After confirmation, mark Phase 2 complete.
+Do not mark Phase 2 complete until the user confirms after reviewing the HTML page.
 
 ## 2-Action Rule
 
@@ -299,3 +314,5 @@ Phase 2 is complete only when:
 - history/list interactions are considered where applicable
 - cross-module scenarios cover more than happy paths
 - PRD-external / operational boundary items are identified and marked as pending clarification
+- `.supertester/confirmations/phase-2-confirmation.html` is generated and given to the user
+- the user explicitly confirms Phase 2

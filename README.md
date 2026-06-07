@@ -42,6 +42,7 @@ Supertester 适合这类场景：
 
 - 需求优先：不理解需求，不进入后续用例生成
 - 文件持久化：关键决策和阶段产物写入 `.supertester/`
+- HTML 确认页：每个阶段在用户确认前生成可直接打开的审查页面
 - 分阶段推进：先需求解析与澄清，再需求关联分析，最后生成功能用例
 - 独立审查：由 `test-reviewer` 负责质量门禁，生成和审查角色分离
 - 保留高保真资产：对视觉、媒体、复杂内容、人工判断场景保留专门的验证方式，不被泛化抹平
@@ -167,6 +168,10 @@ supertester/
 |-- test_plan.md
 |-- findings.md
 |-- progress.md
+|-- confirmations/
+|   |-- phase-1-confirmation.html
+|   |-- phase-2-confirmation.html
+|   `-- phase-3-confirmation.html
 |-- requirements/
 |   |-- parsed-requirements.md
 |   |-- clarifications.json
@@ -181,6 +186,18 @@ supertester/
 ```
 
 这套目录结构的意义，不只是"把结果写出来"，而是把测试设计过程也保存下来，方便后续恢复、审查和追溯。
+
+### HTML 确认页
+
+隐藏目录里的 Markdown/YAML/JSON 仍然是来源真理，但每个阶段提交人工确认前会额外生成一份 HTML 审查页，集中展示该阶段需要确认的内容、缺失项、blocked 项和 reviewer 摘要。
+
+```bash
+python3 scripts/render-confirmation-html.py --phase 1 --project-dir /path/to/project
+python3 scripts/render-confirmation-html.py --phase 2 --project-dir /path/to/project
+python3 scripts/render-confirmation-html.py --phase 3 --project-dir /path/to/project
+```
+
+HTML 模板位于 `templates/confirmation.html`，渲染脚本只使用 Python 标准库，便于在不同项目中稳定复用。
 
 ## 组件分工
 

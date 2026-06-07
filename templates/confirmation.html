@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #18202f;
+      --muted: #667085;
+      --line: #d8dde8;
+      --accent: #2563eb;
+      --accent-soft: #eaf1ff;
+      --warn: #b45309;
+      --warn-soft: #fff7ed;
+      --ok: #047857;
+      --ok-soft: #ecfdf5;
+      --code: #111827;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 24px 32px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1.25;
+      margin: 0 0 8px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      font-size: 15px;
+      margin: 18px 0 8px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 0 0 10px; }
+
+    main {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px 32px 36px;
+    }
+
+    nav {
+      position: sticky;
+      top: 94px;
+      align-self: start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    nav a {
+      display: block;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 7px 8px;
+      border-radius: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    nav a:hover { background: var(--accent-soft); color: var(--accent); }
+
+    .meta {
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .content {
+      min-width: 0;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 650;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcff;
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .source-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcff;
+    }
+
+    .source-card strong {
+      display: block;
+      margin-bottom: 4px;
+      overflow-wrap: anywhere;
+    }
+
+    .source-card span {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+    }
+
+    .missing {
+      background: var(--warn-soft);
+      border-color: #fed7aa;
+      color: var(--warn);
+    }
+
+    .ready {
+      background: var(--ok-soft);
+      border-color: #bbf7d0;
+      color: var(--ok);
+    }
+
+    .doc {
+      overflow-x: auto;
+    }
+
+    .doc table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 13px;
+    }
+
+    .doc th,
+    .doc td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .doc th { background: #eef2f7; }
+
+    pre {
+      background: var(--code);
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 840px) {
+      header { padding: 20px 18px 14px; position: static; }
+      main { grid-template-columns: 1fr; padding: 14px 18px 28px; }
+      nav { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{TITLE}}</h1>
+    <div class="meta">
+      <span>{{PHASE}}</span>
+      <span>Generated: {{GENERATED_AT}}</span>
+      <span>Project: {{PROJECT_DIR}}</span>
+    </div>
+  </header>
+  <main>
+    <nav aria-label="Review sections">
+      {{NAV}}
+    </nav>
+    <section class="content">
+      {{BODY}}
+    </section>
+  </main>
+</body>
+</html>
