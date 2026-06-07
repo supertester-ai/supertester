@@ -199,7 +199,9 @@ python3 scripts/render-confirmation-html.py --phase 3 --project-dir /path/to/pro
 
 脚本默认会在生成后**自动用本地默认浏览器打开**确认页，让用户在关键流程环节直接看到待确认内容（在 macOS / Windows / Linux / WSL 上分别回退到 `open` / `start` / `xdg-open` / `wslview`）。在纯无头或 CI 环境下，可附加 `--no-open` 跳过自动打开。
 
-HTML 模板位于 `templates/confirmation.html`，渲染脚本只使用 Python 标准库，便于在不同项目中稳定复用。
+Phase 3 的 `functional-cases.yaml` 不再以整段 YAML 文本展示，而是**按模块聚合为可折叠卡片**：每个模块一张折叠卡，展开后每条用例是独立折叠项（标注用例类型、优先级、证据类型徽标），用例展开后步骤再按「是否为组」聚合——`group` 步骤折叠其 children 子步骤，散落的叶子步骤合并为一张「独立步骤」表，并标注逐字 / BLOCKED 等标记。
+
+HTML 模板位于 `templates/confirmation.html`，渲染脚本以 Python 标准库为主；其中 Phase 3 的结构化用例卡片会用到 PyYAML（已是 Phase 3 自包含校验 `check-self-contained.py` 的既有依赖），若运行环境缺少 PyYAML，则自动降级为原始 YAML 文本展示，不影响其他阶段。
 
 ## 组件分工
 

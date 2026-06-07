@@ -213,6 +213,161 @@
       font-size: 12px;
     }
 
+    /* ===== 功能测试用例：按模块聚合的折叠卡片 ===== */
+    .cases-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 14px;
+    }
+
+    .sum-chip {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    details.module-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 12px;
+      background: #fbfcff;
+      overflow: hidden;
+    }
+
+    details.module-card > summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 700;
+      font-size: 15px;
+      background: #eef2f7;
+    }
+
+    details.module-card[open] > summary { border-bottom: 1px solid var(--line); }
+
+    .module-body { padding: 10px; }
+
+    details.case-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 10px;
+      background: var(--panel);
+    }
+
+    details.case-card:last-child { margin-bottom: 0; }
+
+    details.case-card > summary {
+      cursor: pointer;
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    summary { list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+
+    summary::before {
+      content: "\25B8";
+      color: var(--muted);
+      display: inline-block;
+      transition: transform 0.15s ease;
+    }
+
+    details[open] > summary::before { transform: rotate(90deg); }
+
+    .cid {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .cname { overflow-wrap: anywhere; }
+
+    .badge-row {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .badge.lvl-p0 { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+    .badge.lvl-p1 { background: #fef3c7; border-color: #fde68a; color: #b45309; }
+    .badge.lvl-p2 { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
+    .badge.type { background: var(--accent-soft); border-color: #cfe0ff; color: var(--accent); }
+    .badge.ev { background: #ecfeff; border-color: #cffafe; color: #0e7490; }
+    .badge.flag-verbatim { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; }
+    .badge.flag-status { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+
+    .case-body { padding: 4px 12px 12px; }
+
+    .case-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px 16px;
+      margin: 8px 0 14px;
+    }
+
+    .case-meta > div { min-width: 0; }
+    .case-meta dt { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+    .case-meta dd { margin: 0; overflow-wrap: anywhere; }
+    .case-meta ul.ka { margin: 4px 0 0; padding-left: 18px; }
+
+    .step-group,
+    .step-loose {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0 0 12px;
+      overflow: hidden;
+    }
+
+    .step-group:last-child,
+    .step-loose:last-child { margin-bottom: 0; }
+
+    .group-title {
+      background: #f3f6fb;
+      padding: 8px 12px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--line);
+    }
+
+    table.step-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .step-table th,
+    .step-table td {
+      border: 1px solid var(--line);
+      border-left: none;
+      border-right: none;
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .step-table th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+    .step-table tr:last-child td { border-bottom: none; }
+
+    .muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+
     @media (max-width: 840px) {
       header { padding: 20px 18px 14px; position: static; }
       main { grid-template-columns: 1fr; padding: 14px 18px 28px; }

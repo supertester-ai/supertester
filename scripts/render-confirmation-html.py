@@ -199,6 +199,200 @@ def markdown_to_html(markdown: str) -> str:
     return "\n".join(output)
 
 
+_LEVEL_ORDER = {"P0": 0, "P1": 1, "P2": 2}
+
+
+def multiline_html(value: object) -> str:
+    """转义并把换行渲染为 <br>，用于 action/result 等可能多行的字段。"""
+    text = "" if value is None else str(value)
+    return html.escape(text).replace("\n", "<br>")
+
+
+def level_badge(level: object) -> str:
+    lv = str(level or "P1").strip().upper() or "P1"
+    cls = {"P0": "p0", "P1": "p1", "P2": "p2"}.get(lv, "p1")
+    return f'<span class="badge lvl-{cls}">{html.escape(lv)}</span>'
+
+
+def step_flags(step: dict) -> str:
+    flags = []
+    if step.get("verbatim"):
+        flags.append('<span class="badge flag-verbatim">逐字</span>')
+    status = step.get("status")
+    if status:
+        flags.append(f'<span class="badge flag-status">{html.escape(str(status).upper())}</span>')
+    return "".join(flags)
+
+
+def leaf_step_row(step: dict) -> str:
+    if not isinstance(step, dict):
+        return f'<tr><td colspan="5">{multiline_html(step)}</td></tr>'
+    source = step.get("source", "") or ""
+    return (
+        "<tr>"
+        f"<td>{multiline_html(step.get('action'))}</td>"
+        f"<td>{multiline_html(step.get('result'))}</td>"
+        f"<td>{level_badge(step.get('level'))}</td>"
+        f"<td>{html.escape(str(source))}</td>"
+        f"<td>{step_flags(step)}</td>"
+        "</tr>"
+    )
+
+
+_STEP_TABLE_HEAD = (
+    '<table class="step-table"><thead><tr>'
+    "<th>操作</th><th>预期结果</th><th>优先级</th><th>来源</th><th>标记</th>"
+    "</tr></thead><tbody>"
+)
+
+
+def render_case_steps(steps: object) -> str:
+    """按是否为'组'聚合渲染步骤：group 步骤折叠其 children，散落的叶子步骤合并为一张表。"""
+    out: list[str] = []
+    leaf_buffer: list[str] = []
+
+    def flush() -> None:
+        if leaf_buffer:
+            out.append(
+                '<div class="step-loose"><div class="group-title">独立步骤</div>'
+                + _STEP_TABLE_HEAD
+                + "".join(leaf_buffer)
+                + "</tbody></table></div>"
+            )
+            leaf_buffer.clear()
+
+    for step in steps or []:
+        if isinstance(step, dict) and step.get("group"):
+            flush()
+            children = step.get("children") or []
+            rows = "".join(leaf_step_row(child) for child in children)
+            out.append(
+                '<div class="step-group">'
+                f'<div class="group-title">组 · {multiline_html(step.get("action"))}'
+                f' <span class="muted">（{len(children)} 步）</span></div>'
+                + _STEP_TABLE_HEAD
+                + rows
+                + "</tbody></table></div>"
+            )
+        else:
+            leaf_buffer.append(leaf_step_row(step))
+    flush()
+    return "\n".join(out)
+
+
+def case_max_level(case: dict) -> str:
+    levels: list[str] = []
+    for step in case.get("steps") or []:
+        if isinstance(step, dict) and step.get("group"):
+            for child in step.get("children") or []:
+                if isinstance(child, dict):
+                    levels.append(str(child.get("level", "P1")).upper())
+        elif isinstance(step, dict):
+            levels.append(str(step.get("level", "P1")).upper())
+    if not levels:
+        return "P1"
+    return sorted(levels, key=lambda lv: _LEVEL_ORDER.get(lv, 1))[0]
+
+
+def render_case_card(case: dict) -> str:
+    cid = html.escape(str(case.get("id", "")))
+    name = html.escape(str(case.get("case_name", "")))
+    ctype = str(case.get("type", "")).strip()
+
+    badges = []
+    type_label = {"matrix": "矩阵", "single": "单条"}.get(ctype, ctype)
+    if type_label:
+        badges.append(f'<span class="badge type">{html.escape(type_label)}</span>')
+    badges.append(level_badge(case_max_level(case)))
+    for ev in case.get("evidence_types") or []:
+        badges.append(f'<span class="badge ev">{html.escape(str(ev))}</span>')
+
+    meta_rows: list[str] = []
+
+    def meta_row(key: str, value_html: str) -> None:
+        if value_html:
+            meta_rows.append(f"<div><dt>{html.escape(key)}</dt><dd>{value_html}</dd></div>")
+
+    meta_row("功能点", html.escape(str(case.get("feature", "") or "")))
+    sub_refs = case.get("sub_refs") or []
+    if sub_refs:
+        meta_row("关联", html.escape(", ".join(str(s) for s in sub_refs)))
+    meta_row("验证方式", html.escape(str(case.get("verification_method", "") or "")))
+    precondition = case.get("precondition")
+    if precondition:
+        meta_row("前置条件", multiline_html(precondition))
+    key_assets = case.get("key_assets") or []
+    if key_assets:
+        items = "".join(f"<li>{multiline_html(asset)}</li>" for asset in key_assets)
+        meta_row("关键资产", f'<ul class="ka">{items}</ul>')
+
+    meta_html = f'<dl class="case-meta">{"".join(meta_rows)}</dl>' if meta_rows else ""
+    steps_html = render_case_steps(case.get("steps"))
+
+    return (
+        '<details class="case-card">'
+        f'<summary><span class="cid">{cid}</span>'
+        f'<span class="cname">{name}</span>'
+        f'<span class="badge-row">{"".join(badges)}</span></summary>'
+        f'<div class="case-body">{meta_html}{steps_html}</div>'
+        "</details>"
+    )
+
+
+def render_functional_cases(text: str) -> str | None:
+    """把 functional-cases.yaml 渲染为按模块聚合的折叠卡片；无法解析时返回 None 由调用方降级。"""
+    try:
+        import yaml  # type: ignore
+    except Exception:
+        return None
+    try:
+        data = yaml.safe_load(text)
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("cases"), list):
+        return None
+
+    cases = [c for c in data["cases"] if isinstance(c, dict)]
+    meta = data.get("meta") or {}
+
+    parts: list[str] = []
+    if isinstance(meta, dict) and meta:
+        bits: list[str] = []
+        if meta.get("total_cases") is not None:
+            bits.append(f"用例 {meta['total_cases']}")
+        if meta.get("total_steps") is not None:
+            bits.append(f"步骤 {meta['total_steps']}")
+        level_dist = meta.get("level_distribution") or {}
+        for key in ("P0", "P1", "P2"):
+            if key in level_dist:
+                bits.append(f"{key} {level_dist[key]}")
+        if bits:
+            chips = "".join(f'<span class="sum-chip">{html.escape(b)}</span>' for b in bits)
+            parts.append(f'<div class="cases-summary">{chips}</div>')
+
+    # 按 module 聚合，保留首次出现顺序
+    order: list[str] = []
+    grouped: dict[str, list[dict]] = {}
+    for case in cases:
+        module = str(case.get("module") or "未分组")
+        if module not in grouped:
+            grouped[module] = []
+            order.append(module)
+        grouped[module].append(case)
+
+    for module in order:
+        module_cases = grouped[module]
+        inner = "".join(render_case_card(c) for c in module_cases)
+        parts.append(
+            '<details class="module-card" open>'
+            f'<summary>{html.escape(module)}'
+            f'<span class="muted"> · {len(module_cases)} 条用例</span></summary>'
+            f'<div class="module-body">{inner}</div>'
+            "</details>"
+        )
+    return "\n".join(parts)
+
+
 def render_document(path: Path) -> str:
     suffix = path.suffix.lower()
     text = read_text(path)
@@ -209,6 +403,10 @@ def render_document(path: Path) -> str:
             pass
         return f"<pre><code>{html.escape(text)}</code></pre>"
     if suffix in {".yaml", ".yml"}:
+        if path.name == "functional-cases.yaml":
+            structured = render_functional_cases(text)
+            if structured is not None:
+                return structured
         return f"<pre><code>{html.escape(text)}</code></pre>"
     if suffix == ".md":
         return markdown_to_html(text)

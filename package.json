@@ -1,6 +1,6 @@
 {
   "name": "supertester",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "AI-driven software testing workflow for Claude Code - from requirements to functional test cases",
   "homepage": "https://github.com/supertester-ai/supertester",
   "repository": "https://github.com/supertester-ai/supertester.git",
