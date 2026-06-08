@@ -135,43 +135,6 @@
       background: #fbfcff;
     }
 
-    .source-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
-    }
-
-    .source-card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      background: #fbfcff;
-    }
-
-    .source-card strong {
-      display: block;
-      margin-bottom: 4px;
-      overflow-wrap: anywhere;
-    }
-
-    .source-card span {
-      color: var(--muted);
-      display: block;
-      font-size: 12px;
-    }
-
-    .missing {
-      background: var(--warn-soft);
-      border-color: #fed7aa;
-      color: var(--warn);
-    }
-
-    .ready {
-      background: var(--ok-soft);
-      border-color: #bbf7d0;
-      color: var(--ok);
-    }
-
     .doc {
       overflow-x: auto;
     }
@@ -229,6 +192,22 @@
       font-size: 12px;
       font-weight: 650;
     }
+
+    .sum-chip.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .gate-missing {
+      margin-top: 12px;
+      border: 1px solid #fed7aa;
+      background: var(--warn-soft);
+      color: var(--warn);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .gate-missing ul { margin: 6px 0 0; padding-left: 18px; }
 
     details.module-card {
       border: 1px solid var(--line);
@@ -367,6 +346,70 @@
     .step-table tr:last-child td { border-bottom: none; }
 
     .muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+    /* ===== 覆盖矩阵：测试角度 × 覆盖状态 ===== */
+    table.cov-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 18px;
+      font-size: 13px;
+    }
+
+    .cov-table th,
+    .cov-table td {
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      text-align: center;
+    }
+
+    .cov-table th { background: #eef2f7; }
+    .cov-table th:first-child,
+    .cov-name { text-align: left; overflow-wrap: anywhere; }
+
+    .cov-yes { color: var(--ok); font-weight: 700; }
+    .cov-no { color: var(--muted); }
+
+    .cov-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 650;
+      border: 1px solid var(--line);
+    }
+
+    .cov-status.ok { background: var(--ok-soft); border-color: #bbf7d0; color: var(--ok); }
+    .cov-status.warn { background: var(--warn-soft); border-color: #fed7aa; color: var(--warn); }
+    .cov-status.bad { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+
+    /* ===== 澄清记录：可读问答 ===== */
+    .cl-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 0 0 10px;
+      background: var(--panel);
+    }
+
+    .cl-item.pending { background: var(--warn-soft); border-color: #fed7aa; }
+    .cl-head { margin-bottom: 6px; }
+    .cl-q, .cl-a { display: flex; gap: 8px; margin-top: 4px; overflow-wrap: anywhere; }
+
+    .cl-tag {
+      flex: none;
+      min-width: 2.6em;
+      height: fit-content;
+      text-align: center;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 650;
+      background: #eef2f7;
+      color: var(--muted);
+    }
+
+    .cl-q .cl-tag { background: var(--accent-soft); color: var(--accent); }
+    .cl-item.pending .cl-a .cl-tag { background: #fed7aa; color: var(--warn); }
 
     @media (max-width: 840px) {
       header { padding: 20px 18px 14px; position: static; }

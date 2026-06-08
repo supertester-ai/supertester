@@ -19,7 +19,6 @@ import os
 import re
 import webbrowser
 from pathlib import Path
-from typing import Iterable
 
 
 PHASE_CONFIG = {
@@ -33,11 +32,12 @@ PHASE_CONFIG = {
             "所有关键模糊项已澄清；如仍有 pending/blocked 项，已在页面中明确暴露。",
             "用户确认后才允许进入 阶段二 需求关联分析。",
         ],
+        # 确认页只保留人审批"需求是否解析/澄清正确"所需的交付物：解析结果 + 澄清问答。
+        # findings.md（跨阶段过程日志）与 test_plan.md（工作流内部状态台账）仍正常生成，
+        # 但属工具/过程材料，不在确认页展示。
         "files": [
             ("解析后的需求", "requirements/parsed-requirements.md"),
             ("澄清记录", "requirements/clarifications.json"),
-            ("分析发现", "findings.md"),
-            ("测试计划", "test_plan.md"),
         ],
     },
     "2": {
@@ -50,12 +50,13 @@ PHASE_CONFIG = {
             "跨模块场景不仅包含正常主流程，也包含中断恢复、历史列表、错误传播和证据链。",
             "test-reviewer 审查摘要已纳入页面；用户确认后才允许进入 阶段三。",
         ],
+        # 确认页只保留关联分析的三个交付物 + 独立审查结论。
+        # findings.md（跨阶段过程日志）仍正常生成，但属过程材料，不在确认页展示。
         "files": [
             ("模块依赖", "requirements/module-dependencies.md"),
             ("隐含需求", "requirements/implicit-requirements.md"),
             ("跨模块场景", "requirements/cross-module-scenarios.md"),
             ("最新关联分析审查", "reviews/review-association-*.md"),
-            ("分析发现", "findings.md"),
         ],
     },
     "3": {
@@ -63,19 +64,21 @@ PHASE_CONFIG = {
         "phase": "阶段三：功能测试用例",
         "output": "phase-3-confirmation.html",
         "checklist": [
-            "覆盖矩阵 已展示完整、部分、缺失和 blocked 覆盖状态。",
-            "功能测试用例 已通过自包含校验和 reviewer 审查。",
-            "用例统计、类型分布、P0/P1/P2 优先级分布和关键缺口已暴露。",
-            "用户确认后，阶段三 才算完成；本工作流到功能测试用例为止。",
+            "功能测试用例已生成，并经 test-reviewer 独立审查。",
+            "覆盖矩阵已展示每个测试表面的覆盖状态与缺口（含 blocked 项）。",
+            "P0/P1/P2 优先级分布与关键缺口已在本页呈现。",
+            "确认后阶段三完成；本工作流到功能测试用例为止。",
         ],
+        # 确认页只保留人审批最终用例所需的内容：覆盖矩阵、用例、独立审查结论。
+        # 以下均仍作为源文件正常生成，但不在确认页展示（属工具/过程材料）：
+        #   - test-surface-plan.md（生成前规划蓝图）
+        #   - deduplication-report.md（去重/聚合台账，且属工具自证）
+        #   - design-artifacts.md（决策表/状态机等设计中间产物）
+        #   - findings.md（跨阶段过程日志；人关注的 blocked 已在覆盖矩阵/用例徽标体现）
         "files": [
             ("覆盖矩阵", "test-cases/coverage-matrix.md"),
             ("功能测试用例", "test-cases/functional-cases.yaml"),
-            ("去重报告", "test-cases/deduplication-report.md"),
-            ("测试面规划", "test-cases/test-surface-plan.md"),
-            ("设计产物", "test-cases/design-artifacts.md"),
             ("最新测试用例审查", "reviews/review-test-cases-*.md"),
-            ("分析发现", "findings.md"),
         ],
     },
 }
@@ -101,19 +104,6 @@ def resolve_file(supertester_dir: Path, rel_path: str) -> Path | None:
         return latest_match(supertester_dir, rel_path)
     path = supertester_dir / rel_path
     return path if path.exists() else None
-
-
-def file_meta(path: Path, project_dir: Path) -> dict[str, str]:
-    stat = path.stat()
-    try:
-        rel = path.relative_to(project_dir)
-    except ValueError:
-        rel = path
-    return {
-        "path": str(rel),
-        "mtime": dt.datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
-        "size": f"{stat.st_size:,} bytes",
-    }
 
 
 def slugify(text: str) -> str:
@@ -355,20 +345,37 @@ def render_functional_cases(text: str) -> str | None:
     cases = [c for c in data["cases"] if isinstance(c, dict)]
     meta = data.get("meta") or {}
 
+    # 统计 blocked 叶子步骤数（人关注的"待澄清/被阻塞"规模）
+    blocked_steps = 0
+    for case in cases:
+        for step in case.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            if step.get("group"):
+                for child in step.get("children") or []:
+                    if isinstance(child, dict) and str(child.get("status", "")).lower() == "blocked":
+                        blocked_steps += 1
+            elif str(step.get("status", "")).lower() == "blocked":
+                blocked_steps += 1
+
     parts: list[str] = []
+    bits: list[str] = []
     if isinstance(meta, dict) and meta:
-        bits: list[str] = []
         if meta.get("total_cases") is not None:
-            bits.append(f"用例 {meta['total_cases']}")
+            bits.append(("", f"用例 {meta['total_cases']}"))
         if meta.get("total_steps") is not None:
-            bits.append(f"步骤 {meta['total_steps']}")
+            bits.append(("", f"步骤 {meta['total_steps']}"))
         level_dist = meta.get("level_distribution") or {}
         for key in ("P0", "P1", "P2"):
             if key in level_dist:
-                bits.append(f"{key} {level_dist[key]}")
-        if bits:
-            chips = "".join(f'<span class="sum-chip">{html.escape(b)}</span>' for b in bits)
-            parts.append(f'<div class="cases-summary">{chips}</div>')
+                bits.append(("", f"{key} {level_dist[key]}"))
+    if blocked_steps:
+        bits.append(("warn", f"BLOCKED {blocked_steps}"))
+    if bits:
+        chips = "".join(
+            f'<span class="sum-chip {cls}">{html.escape(text)}</span>' for cls, text in bits
+        )
+        parts.append(f'<div class="cases-summary">{chips}</div>')
 
     # 按 module 聚合，保留首次出现顺序
     order: list[str] = []
@@ -393,10 +400,213 @@ def render_functional_cases(text: str) -> str | None:
     return "\n".join(parts)
 
 
+def _split_row(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _read_sibling(path: Path, name: str) -> str | None:
+    sibling = path.parent / name
+    try:
+        return sibling.read_text(encoding="utf-8", errors="replace") if sibling.exists() else None
+    except Exception:
+        return None
+
+
+def _surface_name_map(coverage_path: Path) -> dict[str, str]:
+    """从 test-surface-plan.md 提取 TS-id → 模块/页面/子功能 中文名（仅作命名查询，不展示该文件）。"""
+    text = _read_sibling(coverage_path, "test-surface-plan.md")
+    result: dict[str, str] = {}
+    if not text:
+        return result
+    lines = text.splitlines()
+    idx = next((i for i, ln in enumerate(lines)
+                if ln.lstrip().startswith("|") and "Surface ID" in ln), None)
+    if idx is None:
+        return result
+    header = _split_row(lines[idx])
+    if "Surface ID" not in header or "模块/页面/子功能" not in header:
+        return result
+    id_col = header.index("Surface ID")
+    name_col = header.index("模块/页面/子功能")
+    j = idx + 2  # 跳过表头与分隔行
+    while j < len(lines) and lines[j].lstrip().startswith("|"):
+        cells = _split_row(lines[j])
+        if len(cells) > max(id_col, name_col):
+            m = re.search(r"TS-\d+", cells[id_col])
+            if m and cells[name_col]:
+                result[m.group(0)] = cells[name_col]
+        j += 1
+    return result
+
+
+def _feature_module_map(coverage_path: Path) -> dict[str, str]:
+    """从 functional-cases.yaml 提取 feature → module 名作为命名兜底。"""
+    text = _read_sibling(coverage_path, "functional-cases.yaml")
+    result: dict[str, str] = {}
+    if not text:
+        return result
+    try:
+        import yaml  # type: ignore
+        data = yaml.safe_load(text)
+    except Exception:
+        return result
+    for case in (data or {}).get("cases") or []:
+        if isinstance(case, dict):
+            feature = str(case.get("feature", "")).strip()
+            module = str(case.get("module", "")).strip()
+            if feature and module and feature not in result:
+                result[feature] = module
+    return result
+
+
+_COV_SHORT = {
+    "正向": "正", "反向": "反", "边界": "边", "异常": "异",
+    "状态": "状", "权限": "权", "UI/内容": "UI", "证据链": "链",
+}
+_COV_GAP = {"", "-", "—", "–", "n/a", "N/A", "不适用"}
+_COV_STATUS_SET = {"完整", "部分", "缺失", "blocked", "Blocked", "BLOCKED"}
+
+
+def _cov_cell(value: str) -> str:
+    return '<span class="cov-no">—</span>' if value.strip() in _COV_GAP else '<span class="cov-yes">✓</span>'
+
+
+def _cov_status_badge(value: str) -> str:
+    v = value.strip()
+    cls = {"完整": "ok", "部分": "warn", "缺失": "bad", "blocked": "warn", "Blocked": "warn"}.get(v, "")
+    return f'<span class="cov-status {cls}">{html.escape(v)}</span>' if v else ""
+
+
+def render_coverage_matrix(path: Path) -> str:
+    """把覆盖矩阵的代号交叉表渲染为「测试角度 × 覆盖状态」的可读视图，行名映射为中文。"""
+    text = read_text(path)
+    lines = text.splitlines()
+    t_start = next((i for i, ln in enumerate(lines) if ln.lstrip().startswith("|")), None)
+    if t_start is None:
+        return markdown_to_html(text)
+    t_end = t_start
+    while t_end < len(lines) and lines[t_end].lstrip().startswith("|"):
+        t_end += 1
+    table_lines = lines[t_start:t_end]
+    prose = "\n".join(lines[t_end:]).strip()
+    if len(table_lines) < 2:
+        return markdown_to_html(text)
+
+    header = _split_row(table_lines[0])
+    sep = table_lines[1].strip()
+    has_sep = bool(sep) and set(sep) <= set("|-: ")
+    data = [_split_row(r) for r in (table_lines[2:] if has_sep else table_lines[1:])]
+
+    status_col = header.index("覆盖状态") if "覆盖状态" in header else None
+    dim_cols = [
+        i for i, h in enumerate(header)
+        if i != 0 and h != "关联用例" and i != status_col
+    ]
+
+    ts_names = _surface_name_map(path)
+    feat_mod = _feature_module_map(path)
+
+    def readable(first_cell: str) -> str:
+        ts = re.search(r"TS-\d+", first_cell)
+        feat = re.search(r"F-\d+", first_cell)
+        name = None
+        if ts and ts.group(0) in ts_names:
+            name = ts_names[ts.group(0)]
+        elif feat and feat.group(0) in feat_mod:
+            name = feat_mod[feat.group(0)]
+        if name:
+            return f'{html.escape(name)} <span class="muted">{html.escape(first_cell)}</span>'
+        return html.escape(first_cell)
+
+    out = ["<h3>覆盖状态一览</h3>", '<table class="cov-table"><thead><tr>', "<th>需求 / 测试表面</th>"]
+    for i in dim_cols:
+        out.append(f'<th title="{html.escape(header[i])}">{html.escape(_COV_SHORT.get(header[i], header[i]))}</th>')
+    if status_col is not None:
+        out.append("<th>覆盖状态</th>")
+    out.append("</tr></thead><tbody>")
+    for row in data:
+        if not row or all(not c for c in row):
+            continue
+        out.append("<tr>")
+        out.append(f'<td class="cov-name">{readable(row[0])}</td>')
+        for i in dim_cols:
+            out.append(f'<td class="cov-cell">{_cov_cell(row[i] if i < len(row) else "")}</td>')
+        if status_col is not None:
+            # 按枚举从右往左匹配，抗源文件列错位（曾出现行漏写"关联用例"列导致整行右移）
+            status_value = next((c.strip() for c in reversed(row) if c.strip() in _COV_STATUS_SET), "")
+            if not status_value and status_col < len(row):
+                status_value = row[status_col]
+            out.append(f"<td>{_cov_status_badge(status_value)}</td>")
+        out.append("</tr>")
+    out.append("</tbody></table>")
+    if prose:
+        out.append(markdown_to_html(prose))
+    return "\n".join(out)
+
+
+def _clarification_items(data: dict, *keys: str) -> list[dict]:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def render_clarifications(text: str) -> str | None:
+    """把 clarifications.json 渲染为可读问答列表；无法解析时返回 None 由调用方降级。"""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    completed = _clarification_items(data, "completedClarifications", "completed")
+    pending = _clarification_items(data, "pendingClarifications", "pending", "blockedClarifications")
+
+    def card(item: dict, kind: str) -> str:
+        cid = html.escape(str(item.get("id", "")))
+        feature = str(item.get("relatedFeature", "") or item.get("feature", "") or "")
+        feat_html = f'<span class="muted"> · {html.escape(feature)}</span>' if feature else ""
+        question = multiline_html(item.get("question", ""))
+        answer = multiline_html(item.get("answer", "") or item.get("pauseReason", "") or "（待回答）")
+        a_label = "答" if kind == "done" else "待澄清"
+        return (
+            f'<div class="cl-item {kind}">'
+            f'<div class="cl-head"><span class="cid">{cid}</span>{feat_html}</div>'
+            f'<div class="cl-q"><span class="cl-tag">问</span>{question}</div>'
+            f'<div class="cl-a"><span class="cl-tag">{a_label}</span>{answer}</div>'
+            "</div>"
+        )
+
+    status = str(data.get("status", "")).strip()
+    chips = []
+    if status:
+        chips.append(f'<span class="sum-chip">状态 {html.escape(status)}</span>')
+    chips.append(f'<span class="sum-chip">已澄清 {len(completed)}</span>')
+    if pending:
+        chips.append(f'<span class="sum-chip warn">待澄清 {len(pending)}</span>')
+
+    out = [f'<div class="cases-summary">{"".join(chips)}</div>']
+    if pending:
+        out.append("<h3>待澄清 / 未决项</h3>")
+        out.extend(card(item, "pending") for item in pending)
+    out.append("<h3>已澄清</h3>")
+    if completed:
+        out.extend(card(item, "done") for item in completed)
+    else:
+        out.append('<p class="muted">（暂无已澄清记录）</p>')
+    return "\n".join(out)
+
+
 def render_document(path: Path) -> str:
     suffix = path.suffix.lower()
     text = read_text(path)
     if suffix == ".json":
+        if path.name == "clarifications.json":
+            structured = render_clarifications(text)
+            if structured is not None:
+                return structured
         try:
             text = json.dumps(json.loads(text), ensure_ascii=False, indent=2)
         except json.JSONDecodeError:
@@ -409,48 +619,31 @@ def render_document(path: Path) -> str:
                 return structured
         return f"<pre><code>{html.escape(text)}</code></pre>"
     if suffix == ".md":
+        if path.name == "coverage-matrix.md":
+            return render_coverage_matrix(path)
         return markdown_to_html(text)
     return f"<pre><code>{html.escape(text)}</code></pre>"
-
-
-def render_source_cards(files: Iterable[tuple[str, Path | None]], project_dir: Path) -> str:
-    cards = []
-    for label, path in files:
-        if path is None:
-            cards.append(
-                f'<div class="source-card missing"><strong>{html.escape(label)}</strong>'
-                "<span>缺失或尚未生成</span></div>"
-            )
-            continue
-        meta = file_meta(path, project_dir)
-        cards.append(
-            '<div class="source-card ready">'
-            f"<strong>{html.escape(label)}</strong>"
-            f"<span>{html.escape(meta['path'])}</span>"
-            f"<span>修改时间：{html.escape(meta['mtime'])}</span>"
-            f"<span>{html.escape(meta['size'])}</span>"
-            "</div>"
-        )
-    return "\n".join(cards)
 
 
 def render_body(config: dict, files: list[tuple[str, Path | None]], project_dir: Path) -> tuple[str, str]:
     sections: list[tuple[str, str]] = []
     checklist = "\n".join(f"<li>{html.escape(item)}</li>" for item in config["checklist"])
+    # 不再展示"源文件清单"卡片（路径/时间/字节数属工具元数据）。
+    # 但保留人真正关心的安全信号：若有待确认产物尚未生成，在门禁里明确告警。
+    missing = [label for label, path in files if path is None]
+    missing_html = ""
+    if missing:
+        items = "".join(f"<li>{html.escape(m)}</li>" for m in missing)
+        missing_html = (
+            '<div class="gate-missing"><strong>以下待确认产物尚未生成：</strong>'
+            f"<ul>{items}</ul></div>"
+        )
     sections.append(
         (
             "审查门禁",
             '<section class="panel"><h2>审查门禁</h2>'
             '<p><span class="status">待人工确认</span></p>'
-            f'<ul class="checklist">{checklist}</ul></section>',
-        )
-    )
-    sections.append(
-        (
-            "源文件清单",
-            '<section class="panel"><h2>源文件清单</h2><div class="source-grid">'
-            + render_source_cards(files, project_dir)
-            + "</div></section>",
+            f'<ul class="checklist">{checklist}</ul>{missing_html}</section>',
         )
     )
     for label, path in files:
